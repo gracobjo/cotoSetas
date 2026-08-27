@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listPermitsByEmail, buildVerificationUrl, encodePermitToken } from "@/lib/permits";
+import {
+  listPermitsByEmail,
+  buildQrVerificationUrl,
+} from "@/lib/permits";
 import { resolvePublicBaseUrl } from "@/lib/site-url";
+import { generateQrDataUrl } from "@/lib/email-template";
 
 /**
  * GET /api/permisos/recuperar?email=...
+ * Devuelve permisos con QR regenerado (URL corta, fácil de escanear).
  */
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");
@@ -12,25 +17,30 @@ export async function GET(req: NextRequest) {
   }
 
   const origin = resolvePublicBaseUrl(req);
-  const permits = (await listPermitsByEmail(email)).map((p) => {
-    const token = encodePermitToken(p);
-    return {
-      id: p.id,
-      codigo: p.codigo,
-      nombre: p.nombre,
-      dniMask: p.dniMask,
-      modalidad: p.modalidad,
-      precio: p.precio,
-      limite: p.limite,
-      validoDesde: p.validoDesde,
-      validoHasta: p.validoHasta,
-      emitidoEn: p.emitidoEn,
-      qrDataUrl: p.qrDataUrl,
-      status: p.status,
-      verifyUrl: buildVerificationUrl(origin, p.id, p.firma, token),
-      parque: p.parque,
-    };
-  });
+  const list = await listPermitsByEmail(email);
+
+  const permits = await Promise.all(
+    list.map(async (p) => {
+      const verifyUrl = buildQrVerificationUrl(origin, p.id, p.firma);
+      const qrDataUrl = await generateQrDataUrl(verifyUrl);
+      return {
+        id: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        dniMask: p.dniMask,
+        modalidad: p.modalidad,
+        precio: p.precio,
+        limite: p.limite,
+        validoDesde: p.validoDesde,
+        validoHasta: p.validoHasta,
+        emitidoEn: p.emitidoEn,
+        qrDataUrl,
+        status: p.status,
+        verifyUrl,
+        parque: p.parque,
+      };
+    })
+  );
 
   return NextResponse.json({ permits });
 }

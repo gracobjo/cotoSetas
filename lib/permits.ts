@@ -190,9 +190,20 @@ export function buildVerificationUrl(
   firma: string,
   token?: string
 ): string {
-  const base = `${baseUrl.replace(/\/$/, "")}/verificar/${encodeURIComponent(id)}?sig=${firma.slice(0, 16)}`;
-  if (!token) return base;
-  return `${base}&t=${encodeURIComponent(token)}`;
+  // URL corta para QR legible en móvil (sin token largo).
+  // El token completo solo se añade si se pide explícitamente (enlaces de respaldo).
+  const short = `${baseUrl.replace(/\/$/, "")}/v/${encodeURIComponent(id)}?s=${firma.slice(0, 16)}`;
+  if (!token) return short;
+  return `${short}&t=${encodeURIComponent(token)}`;
+}
+
+/** URL corta exclusiva para el QR (fácil de escanear). */
+export function buildQrVerificationUrl(
+  baseUrl: string,
+  id: string,
+  firma: string
+): string {
+  return `${baseUrl.replace(/\/$/, "")}/v/${encodeURIComponent(id)}?s=${firma.slice(0, 16)}`;
 }
 
 export function computeValidity(

@@ -61,7 +61,10 @@ function MiPermisoInner() {
       const first = data.permits[0] as TicketData;
       setPermit(first);
       localStorage.setItem("vdciervos_ultimo_permiso", JSON.stringify(first));
-      toast({ title: "Permiso recuperado" });
+      toast({
+        title: "QR actualizado",
+        description: "Escanea el nuevo código (URL corta, más legible).",
+      });
     } catch {
       toast({ title: "Error al recuperar", variant: "destructive" });
     } finally {
@@ -89,7 +92,35 @@ function MiPermisoInner() {
         </p>
 
         {permit ? (
-          <PermitTicket permit={permit} />
+          <div className="space-y-4">
+            <PermitTicket permit={permit} />
+            <div className="rounded-lg border border-dashed bg-muted/40 p-4 text-sm">
+              <p className="text-muted-foreground">
+                Si el QR no se lee con el móvil, regenera uno corto y más
+                grande (misma compra):
+              </p>
+              <form
+                onSubmit={recuperar}
+                className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
+              >
+                <div className="flex-1">
+                  <Label htmlFor="rec-email">Email de compra</Label>
+                  <Input
+                    id="rec-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1.5"
+                    required
+                    placeholder="el mismo que usaste al comprar"
+                  />
+                </div>
+                <Button type="submit" variant="mushroom" disabled={loading}>
+                  {loading ? "Actualizando…" : "Actualizar QR"}
+                </Button>
+              </form>
+            </div>
+          </div>
         ) : (
           <form
             onSubmit={recuperar}

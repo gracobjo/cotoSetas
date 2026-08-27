@@ -42,7 +42,7 @@ export function buildPermitEmailHtml(
               <div style="font-size:13px;opacity:0.75;">Código de acceso</div>
               <div style="font-size:28px;letter-spacing:0.2em;font-weight:bold;margin:8px 0;font-family:monospace;">${permit.codigo}</div>
               <div style="font-size:12px;opacity:0.7;">ID: ${permit.id}</div>
-              <img src="${qrDataUrl}" alt="QR de verificación" width="200" height="200" style="margin:20px auto;display:block;background:#fff;padding:10px;border-radius:8px;" />
+              <img src="${qrDataUrl}" alt="QR de verificación" width="280" height="280" style="margin:20px auto;display:block;background:#fff;padding:12px;border-radius:8px;" />
               <p style="font-size:13px;opacity:0.85;margin:0;">Muestra este QR al vigilante del coto o SEPRONA</p>
             </td>
           </tr>
@@ -94,10 +94,11 @@ export function buildPermitEmailHtml(
 }
 
 export async function generateQrDataUrl(url: string): Promise<string> {
+  // URL corta + corrección M + tamaño grande = fácil de leer con la cámara del móvil
   return QRCode.toDataURL(url, {
-    errorCorrectionLevel: "H",
-    margin: 2,
-    width: 280,
+    errorCorrectionLevel: "M",
+    margin: 3,
+    width: 400,
     color: { dark: "#0f1f17", light: "#ffffff" },
   });
 }

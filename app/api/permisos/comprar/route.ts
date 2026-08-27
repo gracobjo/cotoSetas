@@ -9,8 +9,7 @@ import {
   maskDni,
   savePermit,
   signPayload,
-  buildVerificationUrl,
-  encodePermitToken,
+  buildQrVerificationUrl,
   type PermitPayload,
   type StoredPermit,
 } from "@/lib/permits";
@@ -120,8 +119,8 @@ export async function POST(req: NextRequest) {
       telegramChatId,
     };
 
-    const token = encodePermitToken(stored);
-    const verifyUrl = buildVerificationUrl(baseUrl, id, firma, token);
+    // QR y enlaces con URL corta (fácil de escanear / abrir en móvil)
+    const verifyUrl = buildQrVerificationUrl(baseUrl, id, firma);
     const qrDataUrl = await generateQrDataUrl(verifyUrl);
     stored.qrDataUrl = qrDataUrl;
 

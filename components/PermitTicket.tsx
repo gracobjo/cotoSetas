@@ -77,20 +77,20 @@ export function PermitTicket({
           </div>
 
           {permit.qrDataUrl && (
-            <div className="rounded-lg border bg-white p-3">
+            <div className="rounded-lg border bg-white p-4">
               <Image
                 src={permit.qrDataUrl}
                 alt="QR de verificación del permiso"
-                width={180}
-                height={180}
+                width={280}
+                height={280}
                 unoptimized
-                className="h-[180px] w-[180px]"
+                className="mx-auto h-[280px] w-[280px]"
               />
-              <p className="mt-2 text-center text-[10px] text-neutral-600">
-                Escanea para verificar
+              <p className="mt-3 text-center text-xs font-medium text-neutral-700">
+                Escanea con la cámara del móvil
               </p>
               {permit.verifyUrl && (
-                <p className="mt-2 max-w-[200px] break-all text-center text-[9px] text-neutral-500">
+                <p className="mt-2 max-w-[280px] break-all text-center text-[10px] text-neutral-500">
                   {permit.verifyUrl}
                 </p>
               )}
