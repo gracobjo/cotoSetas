@@ -9,7 +9,7 @@ let inflight: Promise<PageContent> | null = null;
 async function fetchContent(): Promise<PageContent> {
   if (cache) return cache;
   if (!inflight) {
-    inflight = fetch("/api/contenido")
+    inflight = fetch("/api/contenido", { cache: "no-store" })
       .then((r) => r.json())
       .then((data: PageContent) => {
         cache = data;

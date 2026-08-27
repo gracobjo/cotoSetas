@@ -1,13 +1,15 @@
 "use client";
 
 import { MessageCircle } from "lucide-react";
+import { LINKS } from "@/lib/content";
 import { usePageContent } from "@/hooks/use-page-content";
 
 export function WhatsAppFloat() {
   const { content } = usePageContent();
   const href =
+    process.env.NEXT_PUBLIC_WHATSAPP_URL ||
     content?.contacto.whatsappUrl ||
-    "https://wa.me/34644386025?text=Hola%20consulta%20permisos";
+    LINKS.whatsapp;
 
   return (
     <a
