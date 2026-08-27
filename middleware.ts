@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  ADMIN_COOKIE_NAME_EDGE,
+  verifySessionTokenEdge,
+} from "@/lib/admin-auth-edge";
 
 /** Nombre de cookie (debe coincidir con lib/admin-auth.ts) */
-const ADMIN_COOKIE = "coto_admin_session";
+const ADMIN_COOKIE = ADMIN_COOKIE_NAME_EDGE;
 
 /**
  * Seguridad perimetral (OWASP):
@@ -40,14 +44,21 @@ export function middleware(req: NextRequest) {
     (pathname.startsWith("/admin") && pathname !== "/admin/login") ||
     pathname.startsWith("/documentacion")
   ) {
-    if (!req.cookies.get(ADMIN_COOKIE)?.value) {
+    const token = req.cookies.get(ADMIN_COOKIE)?.value;
+    if (!verifySessionTokenEdge(token)) {
       const login = new URL("/admin/login", req.url);
       login.searchParams.set("next", pathname);
       const redirect = NextResponse.redirect(login);
-      // copiar cabeceras de seguridad al redirect
       res.headers.forEach((v, k) => redirect.headers.set(k, v));
       return redirect;
     }
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", pathname);
+    const authed = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    res.headers.forEach((v, k) => authed.headers.set(k, v));
+    return authed;
   }
 
   return res;

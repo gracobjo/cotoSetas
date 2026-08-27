@@ -6,11 +6,9 @@ import { DocsShell } from "@/components/docs/DocsShell";
 import { MarkdownDoc } from "@/components/docs/MarkdownDoc";
 import { DOCS, getDoc, type DocSlug } from "@/lib/docs-meta";
 
-type Props = { params: { slug: string } };
+export const dynamic = "force-dynamic";
 
-export function generateStaticParams() {
-  return DOCS.map((d) => ({ slug: d.slug }));
-}
+type Props = { params: { slug: string } };
 
 export function generateMetadata({ params }: Props): Metadata {
   const doc = getDoc(params.slug);

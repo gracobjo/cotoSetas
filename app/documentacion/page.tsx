@@ -10,6 +10,8 @@ export const metadata: Metadata = {
     "Manuales de usuario, configuración, desarrollo, requisitos, casos de uso y diagramas UML.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function DocumentacionIndexPage() {
   return (
     <DocsShell>
