@@ -36,7 +36,10 @@ export function middleware(req: NextRequest) {
     ].join("; ")
   );
 
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+  if (
+    (pathname.startsWith("/admin") && pathname !== "/admin/login") ||
+    pathname.startsWith("/documentacion")
+  ) {
     if (!req.cookies.get(ADMIN_COOKIE)?.value) {
       const login = new URL("/admin/login", req.url);
       login.searchParams.set("next", pathname);

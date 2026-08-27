@@ -63,11 +63,6 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/documentacion" className="hover:text-white">
-                  Documentación
-                </Link>
-              </li>
-              <li>
                 <Link href="/admin" className="hover:text-white">
                   Administración
                 </Link>

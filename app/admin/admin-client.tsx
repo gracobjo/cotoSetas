@@ -194,6 +194,9 @@ export default function AdminDashboard() {
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline" size="sm">
+              <Link href="/documentacion">Documentación</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <Link href="/">Ver web</Link>
             </Button>
             <Button variant="ghost" size="sm" onClick={logout}>

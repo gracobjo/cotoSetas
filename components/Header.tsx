@@ -14,7 +14,6 @@ const NAV = [
   { href: "/#rutas", label: "Rutas" },
   { href: "/#parte", label: "Parte Micológico" },
   { href: "/#alertas", label: "Alertas" },
-  { href: "/documentacion", label: "Docs" },
   { href: "/#contacto", label: "Contacto" },
 ];
 
