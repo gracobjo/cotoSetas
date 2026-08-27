@@ -7,7 +7,7 @@ export function WhatsAppFloat() {
   const { content } = usePageContent();
   const href =
     content?.contacto.whatsappUrl ||
-    "https://wa.me/34600000000?text=Hola%20consulta%20permisos";
+    "https://wa.me/34644386025?text=Hola%20consulta%20permisos";
 
   return (
     <a

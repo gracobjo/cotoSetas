@@ -20,7 +20,7 @@ export const LINKS = {
     "https://play.google.com/store/apps/details?id=es.jcyl.ita.sacyl.micocyl",
   adisac: "https://micologia.adisaclavoz.com/rutas/Villardeciervos.html",
   pinares: "https://www.pinaresdeurbion.es/",
-  whatsapp: "https://wa.me/34600000000?text=Hola%2C%20consulta%20sobre%20permisos%20micológicos%20en%20Villardeciervos",
+  whatsapp: "https://wa.me/34644386025?text=Hola%2C%20consulta%20sobre%20permisos%20micológicos%20en%20Villardeciervos",
 } as const;
 
 export type Especie = {
