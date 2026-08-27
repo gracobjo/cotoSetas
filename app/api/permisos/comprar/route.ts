@@ -20,6 +20,7 @@ import { resolvePublicBaseUrl } from "@/lib/site-url";
 import { validateDniNie } from "@/lib/dni";
 import { purchaseSchema, sanitizeText } from "@/lib/security";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { appendAudit, recordPurchaseDay } from "@/lib/audit-store";
 
 /**
  * POST /api/permisos/comprar
@@ -125,6 +126,23 @@ export async function POST(req: NextRequest) {
     stored.qrDataUrl = qrDataUrl;
 
     await savePermit(stored);
+
+    void appendAudit({
+      action: "compra",
+      permitId: stored.id,
+      codigo: stored.codigo,
+      nombre: stored.nombre,
+      email: stored.email,
+      dniMask: stored.dniMask,
+      recolector: stored.recolector,
+      modalidad: stored.modalidad,
+      precio: stored.precio,
+      tarifaId: stored.tarifaId,
+      status: stored.status,
+      ip: clientIp(req),
+      detail: `Compra ${stored.modalidad} · ${stored.precio} €`,
+    }).catch(() => undefined);
+    void recordPurchaseDay(new Date(stored.emitidoEn)).catch(() => undefined);
 
     const emailResult = data.enviarEmail
       ? await sendPermitEmail(stored, verifyUrl, qrDataUrl)

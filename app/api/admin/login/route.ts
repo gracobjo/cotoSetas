@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-auth";
 import { adminLoginSchema, sanitizeText } from "@/lib/security";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { appendAudit } from "@/lib/audit-store";
 
 /** POST /api/admin/login */
 export async function POST(req: NextRequest) {
@@ -56,5 +57,11 @@ export async function POST(req: NextRequest) {
   const token = createSessionToken(username);
   const res = NextResponse.json({ ok: true, user: username });
   setSessionCookie(res, token);
+  void appendAudit({
+    action: "admin_login",
+    nombre: username,
+    ip: ip,
+    detail: "Acceso al panel de administración",
+  }).catch(() => undefined);
   return res;
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { listAllPermits, revokePermit } from "@/lib/permits";
+import { listAllPermits, revokePermit, getPermit } from "@/lib/permits";
+import { appendAudit } from "@/lib/audit-store";
+import { clientIp } from "@/lib/rate-limit";
 import { z } from "zod";
 
 /** GET /api/admin/permisos — listado de permisos emitidos */
@@ -65,10 +67,28 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (parsed.data.status === "revocado") {
+    const before = await getPermit(parsed.data.id);
     const updated = await revokePermit(parsed.data.id);
     if (!updated) {
       return NextResponse.json({ error: "Permiso no encontrado" }, { status: 404 });
     }
+    void appendAudit({
+      action: "revocacion",
+      permitId: updated.id,
+      codigo: updated.codigo,
+      nombre: updated.nombre,
+      email: updated.email,
+      dniMask: updated.dniMask,
+      recolector: updated.recolector,
+      modalidad: updated.modalidad,
+      precio: updated.precio,
+      tarifaId: updated.tarifaId,
+      status: "revocado",
+      ip: clientIp(req),
+      detail: before
+        ? `Revocado por admin (antes: ${before.status})`
+        : "Revocado por admin",
+    }).catch(() => undefined);
     return NextResponse.json({ ok: true, permit: { id: updated.id, status: updated.status } });
   }
 

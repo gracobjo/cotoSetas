@@ -1,6 +1,6 @@
 # Manual de usuario — Villardeciervos Micología
 
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Audiencia:** recolectores, visitantes y personal de vigilancia del coto  
 **Sitio:** web informativa y de permisos digitales del Parque Micológico Montes del Noroeste Zamorano (PMZA-50.001)
 
@@ -76,7 +76,7 @@ Los precios los puede actualizar el administrador del coto.
 6. Confirma el pago (en la versión actual el cobro es **simulado**).
 7. Se genera el permiso con:
    - Código de 8 caracteres  
-   - QR de verificación  
+   - QR de verificación (URL corta `/v/[id]`, fácil de escanear)  
    - Firma digital anti-falsificación  
 
 ### Tras la compra
@@ -93,7 +93,12 @@ Los precios los puede actualizar el administrador del coto.
 2. Enseña el **QR** junto al **DNI físico**.
 3. El vigilante escanea el QR → página **PERMISO VÁLIDO** (o aviso si está caducado/revocado/falsificado).
 
-El QR contiene un enlace firmado; no es solo una imagen decorativa.
+El QR apunta a una URL corta firmada (`/v/...`); no es solo una imagen decorativa.
+
+### Si el móvil no lee el QR
+
+1. En **Mi permiso**, usa **Actualizar QR** con el email de compra (regenera un código más grande y corto).
+2. Comprueba que el teléfono está en la misma Wi‑Fi y que la web no usa `localhost` en el enlace.
 
 ---
 
@@ -103,7 +108,7 @@ Si cambias de dispositivo:
 
 1. Ve a **Mi permiso**.
 2. Introduce el **email** usado en la compra.
-3. Se recuperan los permisos asociados (en el servidor).
+3. Se recuperan los permisos asociados (en el servidor) con QR regenerado.
 
 También puedes usar el ticket guardado en el propio móvil (almacenamiento local).
 
@@ -127,7 +132,7 @@ Cuando haya parte, verás un banner y, si diste permiso, una notificación.
 | DNI rechazado | Comprueba la letra de control (algoritmo oficial español) |
 | No llega el email | Revisa spam; con `onboarding@resend.dev` solo llega al email de la cuenta Resend |
 | No llega Telegram | Debes haber hecho `/start` al bot; chat ID correcto |
-| El QR no abre en el móvil | En local, el móvil debe alcanzar la IP LAN del PC y el firewall debe permitir el puerto |
+| El QR no se lee / no abre | Actualiza el QR en Mi permiso; en local usa IP LAN y abre el puerto en el firewall |
 | Permiso “no encontrado” | Emite uno nuevo tras reiniciar/configurar bien la URL pública |
 
 ---

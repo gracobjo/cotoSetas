@@ -6,6 +6,7 @@ import {
   type PermitPayload,
   type StoredPermit,
 } from "@/lib/permits";
+import { recordVerify } from "@/lib/audit-store";
 
 function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
   const payload: PermitPayload = {
@@ -98,6 +99,8 @@ export async function GET(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  void recordVerify().catch(() => undefined);
 
   if (id) {
     const fromStore = await getPermit(id);

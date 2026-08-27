@@ -1,6 +1,6 @@
 # Manual de configuración — Villardeciervos Micología
 
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Audiencia:** administradores del coto e IT de despliegue
 
 ---
@@ -78,14 +78,22 @@ URL: `/admin` → login en `/admin/login`
 
 Pestañas:
 
-1. **Contenido / Enlaces:** CMS de la landing
+1. **Dashboard / KPIs:** indicadores de uso e ingresos + **auditoría** de compras
+   - Ingresos (hoy / 7 / 30 días / total), ticket medio
+   - Permisos activos, revocados y caducados
+   - Visitas web y verificaciones de QR
+   - Desglose por modalidad y tipo de recolector
+   - Tabla de auditoría: quién compró qué, fecha, importe, email, DNI enmascarado
+   - API: `GET /api/admin/stats`
+   - Persistencia de métricas: `data/usage.json`, `data/audit.json`
+2. **Contenido / Enlaces:** CMS de la landing
    - Hero (títulos, descripción, imagen, CTAs)
    - Introducción (título + HTML básico sanitizado)
    - **CRUD de enlaces oficiales** (crear, editar, ordenar, activar, eliminar)
    - WhatsApp y disclaimer del footer
    - Persistencia: `data/contenido.json`
-2. **Tarifas:** editar precio, kg/día, activar/desactivar, notas de campaña (`data/tarifas.json`)
-3. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar** (`data/permits.json`)
+3. **Tarifas:** editar precio, kg/día, activar/desactivar, notas de campaña (`data/tarifas.json`)
+4. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar** (`data/permits.json`)
 
 Estos ficheros **no** se suben a Git (privacidad).
 
@@ -114,7 +122,7 @@ Cron de alertas: `vercel.json` llama a `/api/alerta/check` cada hora.
 New-NetFirewallRule -DisplayName "cotoSetas Next.js 3000" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow
 ```
 
-4. Emitir un permiso **nuevo** (los QR antiguos con localhost no sirven).
+4. Emitir un permiso **nuevo** o usar **Actualizar QR** en Mi permiso (los QR antiguos con URL larga o `localhost` pueden fallar).
 
 ---
 
@@ -124,7 +132,7 @@ Hoy el cobro es simulado. Antes de firmar el permiso en producción:
 
 1. Stripe Checkout o Redsys.
 2. Emitir permiso solo tras `payment_intent.succeeded` (o equivalente).
-3. Registrar el ID de pago en el permiso.
+3. Registrar el ID de pago en el permiso (y en la auditoría).
 
 ---
 
@@ -133,6 +141,6 @@ Hoy el cobro es simulado. Antes de firmar el permiso en producción:
 - [ ] Secretos distintos en producción (`PERMIT_HMAC_SECRET`, `ADMIN_*`)
 - [ ] URL pública correcta
 - [ ] Resend / Telegram probados
-- [ ] Admin puede entrar y editar tarifas
-- [ ] Compra de prueba + verificación QR
+- [ ] Admin puede entrar, ver Dashboard/KPIs y editar tarifas
+- [ ] Compra de prueba + verificación QR + aparece en auditoría
 - [ ] Disclaimer legal visible en footer

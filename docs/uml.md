@@ -1,6 +1,7 @@
 # Diagramas UML
 
 **Sistema:** Villardeciervos Micología  
+**Versión:** 1.2  
 **Notación:** UML 2 (representación Mermaid compatible)
 
 ---
@@ -51,6 +52,31 @@ classDiagram
     +String telegramChatId
   }
 
+  class AuditEntry {
+    +String id
+    +String at
+    +String action
+    +String permitId
+    +String nombre
+    +String email
+    +String dniMask
+    +String modalidad
+    +Number precio
+  }
+
+  class UsageStore {
+    +Map visitsByDay
+    +Map verifiesByDay
+    +Map purchasesByDay
+    +Map pageHits
+  }
+
+  class AdminStats {
+    +Object kpis
+    +KpiBreakdown[] byModalidad
+    +AuditEntry[] audit
+  }
+
   class AdminSession {
     +String sub
     +Number iat
@@ -67,6 +93,12 @@ classDiagram
     +emit()
     +verify()
     +revoke()
+  }
+
+  class MetricsService {
+    +appendAudit()
+    +recordVisit()
+    +computeAdminStats()
   }
 
   class PageContent {
@@ -95,13 +127,20 @@ classDiagram
   PageContent "1" *-- "0..*" OfficialLink : enlaces
   StoredPermit --|> PermitPayload : extiende
   StoredPermit --> Tarifa : tarifaId
+  AuditEntry --> StoredPermit : permitId
+  AdminStats o-- AuditEntry : incluye
+  AdminStats o-- UsageStore : agrega
   PermitService --> StoredPermit : gestiona
   PermitService --> Tarifa : consulta
   PermitService --> DeliveryService : notifica
+  PermitService --> MetricsService : audita compra/revocación
+  MetricsService --> AuditEntry : persiste
+  MetricsService --> UsageStore : persiste
   ContentService --> PageContent : gestiona
   AdminSession ..> TarifasConfig : administra
   AdminSession ..> PageContent : edita CMS
   AdminSession ..> StoredPermit : audita
+  AdminSession ..> AdminStats : consulta KPIs
 ```
 
 ---
@@ -131,13 +170,22 @@ classDiagram
     precio = 20
   }
 
+  class auditoria_compra {
+    action = compra
+    codigo = 8AZTWU6R
+    precio = 20
+    at = 2026-08-27T10:15:00Z
+  }
+
   class sesion_admin {
     sub = admin
     exp = 1724750000
   }
 
   permiso_ejemplo --> tarifa_gen2d : emitido con
+  auditoria_compra --> permiso_ejemplo : registra
   sesion_admin ..> permiso_ejemplo : puede revocar
+  sesion_admin ..> auditoria_compra : consulta en dashboard
 ```
 
 ---
@@ -148,12 +196,14 @@ classDiagram
 flowchart TB
   subgraph cliente[Cliente Web]
     UI[Next.js Pages / Components]
+    Beacon[AnalyticsBeacon]
   end
 
   subgraph app[Aplicación Next.js]
     MW[Middleware OWASP]
     API[API Routes]
     LIB[lib dominio]
+    METRICS[audit-store / admin-stats]
     DATA[(data/*.json)]
   end
 
@@ -165,8 +215,11 @@ flowchart TB
   end
 
   UI --> MW --> API
+  Beacon --> API
   API --> LIB
+  API --> METRICS
   LIB --> DATA
+  METRICS --> DATA
   LIB --> RESEND
   LIB --> TG
   UI --> OSM
@@ -186,17 +239,20 @@ flowchart TB
   A((Admin))
 
   R --> Compra[Comprar permiso]
-  R --> Mostrar[Mostrar ticket]
+  R --> Mostrar[Mostrar ticket / actualizar QR]
   Compra --> Entrega[Email/Telegram]
-  V --> Verificar[Verificar QR]
+  Compra --> Audit[Registrar auditoría]
+  V --> Verificar[Verificar QR corto]
   A --> Login[Login]
+  Login --> KPIs[Dashboard KPIs]
   Login --> Tarifas[Editar tarifas]
   Login --> Auditoria[Listar/Revocar]
+  KPIs --> Audit
 ```
 
 ---
 
-## 5. Diagrama de secuencia — compra y verificación (comportamiento)
+## 5. Diagrama de secuencia — compra, auditoría y verificación (comportamiento)
 
 ```mermaid
 sequenceDiagram
@@ -204,23 +260,33 @@ sequenceDiagram
   participant Web as Web App
   participant API as API Comprar
   participant Store as Persistencia
+  participant Audit as Audit/Usage
   participant Mail as Resend/Telegram
   actor Vig as Vigilante
   participant Ver as API Verificar
+  actor Ad as Admin
+  participant Stats as API Stats
 
   U->>Web: Completa formulario
   Web->>API: POST /api/permisos/comprar
   API->>API: Valida Zod + DNI + rate limit
   API->>Store: Guarda StoredPermit firmado
+  API->>Audit: append compra + contador día
   API->>Mail: Envía comprobante
-  API-->>Web: permit + QR
+  API-->>Web: permit + QR corto
   Web-->>U: /mi-permiso
 
-  Vig->>Web: Escanea QR
+  Vig->>Web: Escanea /v/id?s=
   Web->>Ver: GET /api/permisos/verificar
-  Ver->>Store: Busca id / valida token
+  Ver->>Audit: recordVerify
+  Ver->>Store: Busca id
   Ver-->>Web: valid + datos
   Web-->>Vig: PERMISO VÁLIDO / NO VÁLIDO
+
+  Ad->>Stats: GET /api/admin/stats
+  Stats->>Store: listAllPermits
+  Stats->>Audit: listAudit + usage
+  Stats-->>Ad: KPIs + auditoría
 ```
 
 ---
@@ -239,11 +305,12 @@ flowchart TD
   G --> F
   F -->|OK| H[Aceptar normativa]
   H --> I[Pago simulado]
-  I --> J[Firmar y generar QR]
+  I --> J[Firmar y generar QR corto]
   J --> K[Persistir permiso]
-  K --> L[Enviar notificaciones]
-  L --> M[Mostrar ticket móvil]
-  M --> N([Fin])
+  K --> L[Registrar auditoría compra]
+  L --> M[Enviar notificaciones]
+  M --> N[Mostrar ticket móvil]
+  N --> O([Fin])
 ```
 
 ---
@@ -252,8 +319,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A([Inicio]) --> B[Escanear QR]
-  B --> C[Abrir URL de verificación]
+  A([Inicio]) --> B[Escanear QR corto /v/id]
+  B --> C[Redirigir a /verificar]
   C --> D{¿Firma HMAC OK?}
   D -->|No| E[Posible falsificación]
   D -->|Sí| F{¿Estado activo y en fecha?}
@@ -263,4 +330,21 @@ flowchart TD
   E --> J([Fin])
   G --> J
   I --> J
+```
+
+---
+
+## 8. Diagrama de actividades — consulta de KPIs (admin)
+
+```mermaid
+flowchart TD
+  A([Inicio]) --> B[Login admin]
+  B --> C[Abrir Dashboard / KPIs]
+  C --> D[Cargar /api/admin/stats]
+  D --> E[Ver ingresos, visitas, desgloses]
+  E --> F[Filtrar auditoría por texto]
+  F --> G{¿Abrir permiso?}
+  G -->|Sí| H[Ir a /verificar/id]
+  G -->|No| I([Fin])
+  H --> I
 ```

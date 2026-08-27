@@ -18,8 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Save, Shield, Search } from "lucide-react";
+import { LogOut, Save, Shield, Search, LayoutDashboard } from "lucide-react";
 import { AdminContenidoForm } from "@/components/admin/AdminContenidoForm";
+import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
 import { invalidatePageContentCache } from "@/hooks/use-page-content";
 
 type PermitRow = {
@@ -36,13 +37,13 @@ type PermitRow = {
   validoHasta: string;
 };
 
-type Tab = "contenido" | "tarifas" | "permisos";
+type Tab = "dashboard" | "contenido" | "tarifas" | "permisos";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { toast } = useToast();
   const [user, setUser] = useState("");
-  const [tab, setTab] = useState<Tab>("contenido");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [config, setConfig] = useState<TarifasConfig | null>(null);
   const [pageContent, setPageContent] = useState<PageContent | null>(null);
   const [permits, setPermits] = useState<PermitRow[]>([]);
@@ -207,6 +208,7 @@ export default function AdminDashboard() {
         <div className="mb-6 flex flex-wrap gap-2">
           {(
             [
+              ["dashboard", "Dashboard / KPIs"],
               ["contenido", "Contenido / Enlaces"],
               ["tarifas", "Tarifas"],
               ["permisos", "Permisos emitidos"],
@@ -218,10 +220,15 @@ export default function AdminDashboard() {
               size="sm"
               onClick={() => setTab(id)}
             >
+              {id === "dashboard" && (
+                <LayoutDashboard className="mr-1 h-3.5 w-3.5" />
+              )}
               {label}
             </Button>
           ))}
         </div>
+
+        {tab === "dashboard" && <AdminStatsPanel />}
 
         {tab === "contenido" && pageContent && (
           <AdminContenidoForm

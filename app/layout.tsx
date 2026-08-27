@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { SITE } from "@/lib/content";
 import "./globals.css";
 
@@ -72,6 +73,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <AnalyticsBeacon />
           <Toaster />
         </ThemeProvider>
       </body>

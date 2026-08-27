@@ -23,31 +23,31 @@ export const DOCS: DocMeta[] = [
   {
     slug: "configuracion",
     title: "Manual de configuración",
-    description: "Variables de entorno, admin, email, Telegram y despliegue.",
+    description: "Variables de entorno, admin, KPIs, email, Telegram y despliegue.",
     file: "manual-configuracion.md",
   },
   {
     slug: "desarrollo",
     title: "Manual de desarrollo",
-    description: "Arquitectura, módulos, flujos y guía para contribuir.",
+    description: "Arquitectura, módulos, KPIs/auditoría, flujos y guía para contribuir.",
     file: "manual-desarrollo.md",
   },
   {
     slug: "requisitos",
     title: "Requisitos",
-    description: "Requisitos funcionales y no funcionales.",
+    description: "Requisitos funcionales y no funcionales (incl. KPIs y auditoría).",
     file: "requisitos.md",
   },
   {
     slug: "casos-de-uso",
     title: "Casos de uso",
-    description: "Catálogo y especificaciones de casos de uso.",
+    description: "Catálogo y especificaciones, incluido dashboard de KPIs.",
     file: "casos-de-uso.md",
   },
   {
     slug: "uml",
     title: "Diagramas UML",
-    description: "Clases, objetos, componentes, secuencia y actividades.",
+    description: "Clases, objetos, componentes, secuencia, actividades y KPIs.",
     file: "uml.md",
   },
 ];
