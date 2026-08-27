@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { hasDatabase, kvGet, kvSet } from "@/lib/db";
 
 export type Tarifa = {
   id: string;
@@ -24,6 +25,7 @@ export type TarifasConfig = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const FILE = path.join(DATA_DIR, "tarifas.json");
+const KV_KEY = "tarifas";
 
 /** Tarifas base campaña actual (PMZA-50.001 / Zamora) según rangos Micocyl CyL. */
 export const DEFAULT_TARIFAS: Tarifa[] = [
@@ -147,17 +149,27 @@ async function ensureFile(): Promise<TarifasConfig> {
   }
 }
 
-export async function getTarifasConfig(): Promise<TarifasConfig> {
+async function loadConfig(): Promise<TarifasConfig> {
+  if (hasDatabase()) {
+    const fromDb = await kvGet<TarifasConfig>(KV_KEY);
+    if (fromDb?.tarifas?.length) return fromDb;
+    await kvSet(KV_KEY, DEFAULT_CONFIG);
+    return DEFAULT_CONFIG;
+  }
   return ensureFile();
 }
 
+export async function getTarifasConfig(): Promise<TarifasConfig> {
+  return loadConfig();
+}
+
 export async function getTarifasActivas(): Promise<Tarifa[]> {
-  const cfg = await ensureFile();
+  const cfg = await loadConfig();
   return cfg.tarifas.filter((t) => t.activa);
 }
 
 export async function getTarifaById(id: string): Promise<Tarifa | undefined> {
-  const cfg = await ensureFile();
+  const cfg = await loadConfig();
   return cfg.tarifas.find((t) => t.id === id && t.activa);
 }
 
@@ -170,6 +182,10 @@ export async function saveTarifasConfig(
     updatedAt: new Date().toISOString(),
     updatedBy,
   };
+  if (hasDatabase()) {
+    await kvSet(KV_KEY, next);
+    return next;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FILE, JSON.stringify(next, null, 2), "utf8");
   return next;

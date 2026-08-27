@@ -1,10 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { ensureSchema, getSql, hasDatabase, kvGet, kvSet } from "@/lib/db";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const AUDIT_FILE = path.join(DATA_DIR, "audit.json");
 const USAGE_FILE = path.join(DATA_DIR, "usage.json");
+const USAGE_KEY = "usage";
 
 export type AuditAction =
   | "compra"
@@ -32,7 +34,6 @@ export type AuditEntry = {
 };
 
 export type UsageStore = {
-  /** YYYY-MM-DD → conteo */
   visitsByDay: Record<string, number>;
   verifiesByDay: Record<string, number>;
   purchasesByDay: Record<string, number>;
@@ -51,7 +52,7 @@ function dayKey(d = new Date()): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function readJson<T>(file: string, fallback: T): Promise<T> {
+async function readJsonFile<T>(file: string, fallback: T): Promise<T> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
     const raw = await fs.readFile(file, "utf8");
@@ -61,39 +62,77 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
   }
 }
 
-async function writeJson(file: string, data: unknown): Promise<void> {
+async function writeJsonFile(file: string, data: unknown): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(file, JSON.stringify(data, null, 2), "utf8");
 }
 
-/** Añade una entrada de auditoría (compras, revocaciones, etc.). */
 export async function appendAudit(
   entry: Omit<AuditEntry, "id" | "at"> & { at?: string }
 ): Promise<AuditEntry> {
-  const list = await readJson<AuditEntry[]>(AUDIT_FILE, []);
   const full: AuditEntry = {
     id: randomUUID(),
     at: entry.at || new Date().toISOString(),
     ...entry,
   };
-  list.unshift(full);
-  // Conservar últimas 5000 entradas
-  const trimmed = list.slice(0, 5000);
-  await writeJson(AUDIT_FILE, trimmed);
+
+  if (!hasDatabase()) {
+    const list = await readJsonFile<AuditEntry[]>(AUDIT_FILE, []);
+    list.unshift(full);
+    await writeJsonFile(AUDIT_FILE, list.slice(0, 5000));
+    return full;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const { id, at, action, ...rest } = full;
+  const payload = JSON.stringify({ ...rest, action });
+  await sql`
+    INSERT INTO audit_log (id, at, action, payload)
+    VALUES (${id}, ${at}, ${action}, ${payload}::jsonb)
+  `;
   return full;
 }
 
 export async function listAudit(limit = 200): Promise<AuditEntry[]> {
-  const list = await readJson<AuditEntry[]>(AUDIT_FILE, []);
-  return list.slice(0, limit);
+  if (!hasDatabase()) {
+    const list = await readJsonFile<AuditEntry[]>(AUDIT_FILE, []);
+    return list.slice(0, limit);
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, at, action, payload
+    FROM audit_log
+    ORDER BY at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => {
+    const payload = (r.payload || {}) as Record<string, unknown>;
+    return {
+      id: String(r.id),
+      at: new Date(r.at as string).toISOString(),
+      action: r.action as AuditAction,
+      ...payload,
+    } as AuditEntry;
+  });
 }
 
 export async function loadUsage(): Promise<UsageStore> {
-  return readJson<UsageStore>(USAGE_FILE, { ...EMPTY_USAGE });
+  if (!hasDatabase()) {
+    return readJsonFile<UsageStore>(USAGE_FILE, { ...EMPTY_USAGE });
+  }
+  const stored = await kvGet<UsageStore>(USAGE_KEY);
+  return stored ? { ...EMPTY_USAGE, ...stored } : { ...EMPTY_USAGE };
 }
 
 async function saveUsage(u: UsageStore): Promise<void> {
-  await writeJson(USAGE_FILE, u);
+  if (!hasDatabase()) {
+    await writeJsonFile(USAGE_FILE, u);
+    return;
+  }
+  await kvSet(USAGE_KEY, u);
 }
 
 export async function recordVisit(pagePath: string): Promise<void> {
@@ -120,7 +159,6 @@ export async function recordPurchaseDay(at = new Date()): Promise<void> {
   await saveUsage(u);
 }
 
-/** Suma valores de un mapa día→n en los últimos N días (incluye hoy). */
 export function sumLastDays(
   map: Record<string, number>,
   days: number,

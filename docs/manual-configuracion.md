@@ -85,34 +85,44 @@ Pestañas:
    - Desglose por modalidad y tipo de recolector
    - Tabla de auditoría: quién compró qué, fecha, importe, email, DNI enmascarado
    - API: `GET /api/admin/stats`
-   - Persistencia de métricas: `data/usage.json`, `data/audit.json`
 2. **Contenido / Enlaces:** CMS de la landing
    - Hero (títulos, descripción, imagen, CTAs)
    - Introducción (título + HTML básico sanitizado)
    - **CRUD de enlaces oficiales** (crear, editar, ordenar, activar, eliminar)
    - WhatsApp y disclaimer del footer
-   - Persistencia: `data/contenido.json`
-3. **Tarifas:** editar precio, kg/día, activar/desactivar, notas de campaña (`data/tarifas.json`)
-4. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar** (`data/permits.json`)
+3. **Tarifas:** editar precio, kg/día, activar/desactivar, notas de campaña
+4. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar**
 
-Estos ficheros **no** se suben a Git (privacidad).
+Con `DATABASE_URL` todo esto vive en Neon Postgres (no en ficheros locales).
 
 ---
 
-## 4. Despliegue en Vercel
+## 4. Persistencia (Neon Postgres)
+
+Con `DATABASE_URL` (Neon), permisos, tarifas, CMS, auditoría y KPIs se guardan en Postgres.
+
+```bash
+npm run db:migrate
+```
+
+Sin `DATABASE_URL`, se usa `data/*.json` (solo desarrollo local; no sirve en Vercel).
+
+En Vercel: añade la misma `DATABASE_URL` (pooled) en Environment Variables.
+
+---
+
+## 5. Despliegue en Vercel
 
 1. Importar el repo GitHub.
-2. Configurar **todas** las variables de entorno en el panel de Vercel.
+2. Configurar **todas** las variables de entorno en el panel de Vercel (incluida `DATABASE_URL`).
 3. `NEXT_PUBLIC_SITE_URL=https://tu-dominio.vercel.app`
 4. Deploy.
-
-Persistencia: en serverless, el sistema de ficheros es efímero. Para producción real, migrar `data/` a **Postgres / Vercel KV / Supabase**.
 
 Cron de alertas: `vercel.json` llama a `/api/alerta/check` cada hora.
 
 ---
 
-## 5. Firewall y QR en móvil (local)
+## 6. Firewall y QR en móvil (local)
 
 1. `NEXT_PUBLIC_SITE_URL=http://TU_IP_WIFI:3000`
 2. Móvil en la misma Wi‑Fi.
@@ -126,7 +136,7 @@ New-NetFirewallRule -DisplayName "cotoSetas Next.js 3000" -Direction Inbound -Pr
 
 ---
 
-## 6. Pago real (pendiente de integración)
+## 7. Pago real (pendiente de integración)
 
 Hoy el cobro es simulado. Antes de firmar el permiso en producción:
 
@@ -136,9 +146,11 @@ Hoy el cobro es simulado. Antes de firmar el permiso en producción:
 
 ---
 
-## 7. Checklist de puesta en marcha
+## 8. Checklist de puesta en marcha
 
 - [ ] Secretos distintos en producción (`PERMIT_HMAC_SECRET`, `ADMIN_*`)
+- [ ] `DATABASE_URL` de Neon en local y en Vercel
+- [ ] `npm run db:migrate` ejecutado
 - [ ] URL pública correcta
 - [ ] Resend / Telegram probados
 - [ ] Admin puede entrar, ver Dashboard/KPIs y editar tarifas

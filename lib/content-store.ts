@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { LINKS, SITE } from "@/lib/content";
+import { hasDatabase, kvGet, kvSet } from "@/lib/db";
 
 export type LinkIcon =
   | "Trees"
@@ -56,6 +57,7 @@ export type PageContent = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const FILE = path.join(DATA_DIR, "contenido.json");
+const KV_KEY = "contenido";
 
 export const DEFAULT_CONTENT: PageContent = {
   updatedAt: new Date().toISOString(),
@@ -154,8 +156,18 @@ async function ensureFile(): Promise<PageContent> {
   }
 }
 
-export async function getPageContent(): Promise<PageContent> {
+async function loadContent(): Promise<PageContent> {
+  if (hasDatabase()) {
+    const fromDb = await kvGet<PageContent>(KV_KEY);
+    if (fromDb?.enlaces?.items) return fromDb;
+    await kvSet(KV_KEY, DEFAULT_CONTENT);
+    return DEFAULT_CONTENT;
+  }
   return ensureFile();
+}
+
+export async function getPageContent(): Promise<PageContent> {
+  return loadContent();
 }
 
 export async function savePageContent(
@@ -171,6 +183,10 @@ export async function savePageContent(
     updatedAt: new Date().toISOString(),
     updatedBy,
   };
+  if (hasDatabase()) {
+    await kvSet(KV_KEY, next);
+    return next;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FILE, JSON.stringify(next, null, 2), "utf8");
   return next;
