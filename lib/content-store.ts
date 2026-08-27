@@ -65,8 +65,7 @@ export const DEFAULT_CONTENT: PageContent = {
     subtitle: "Micología · Sierra de la Culebra",
     description:
       "Enclave de enorme riqueza micológica en pleno corazón de la Sierra de la Culebra. Obtén tu permiso digital verificable antes de salir al campo.",
-    backgroundImage:
-      "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80",
+    backgroundImage: "/ciervo.png",
     ctaPrimary: "Obtener permiso",
     ctaSecondary: "Activar alerta del primer parte",
   },

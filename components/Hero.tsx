@@ -16,15 +16,18 @@ export function Hero() {
       className="relative flex min-h-[92vh] items-end overflow-hidden"
     >
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className="absolute inset-0 scale-105 bg-cover bg-[position:58%_28%] sm:bg-[position:55%_22%] brightness-[1.08] contrast-[1.08] saturate-[1.05]"
         style={{
-          backgroundImage: `url('${hero?.backgroundImage || "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80"}')`,
+          backgroundImage: `url('${hero?.backgroundImage || "/ciervo.png"}')`,
         }}
         role="img"
-        aria-label={hero?.title || "Pinares de la Sierra de la Culebra"}
+        aria-label={
+          hero?.title || "Ciervo en Villardeciervos, Sierra de la Culebra"
+        }
       />
-      <div className="absolute inset-0 bg-hero-overlay" />
-      <div className="absolute inset-0 bg-gradient-to-t from-forest-dark via-forest-dark/40 to-transparent" />
+      {/* Solo oscurece la zona del texto; el ciervo queda visible arriba */}
+      <div className="absolute inset-0 bg-gradient-to-t from-forest-dark/90 via-forest-dark/35 to-black/10" />
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-forest-dark/80 to-transparent" />
 
       <div className="relative z-10 container-narrow w-full px-4 pb-16 pt-28 sm:px-6 sm:pb-24 lg:px-8">
         <motion.p

@@ -70,7 +70,7 @@ const config: Config = {
         "forest-pattern":
           "radial-gradient(ellipse at top, hsl(var(--forest) / 0.15), transparent 60%), radial-gradient(ellipse at bottom right, hsl(var(--earth) / 0.12), transparent 50%)",
         "hero-overlay":
-          "linear-gradient(to bottom, hsl(var(--forest-dark) / 0.55), hsl(var(--forest-dark) / 0.75))",
+          "linear-gradient(to bottom, hsl(var(--forest-dark) / 0.15), hsl(var(--forest-dark) / 0.55))",
       },
       keyframes: {
         "fade-in": {
