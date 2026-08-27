@@ -23,59 +23,6 @@ export const LINKS = {
   whatsapp: "https://wa.me/34600000000?text=Hola%2C%20consulta%20sobre%20permisos%20micológicos%20en%20Villardeciervos",
 } as const;
 
-export type Tarifa = {
-  id: string;
-  recolector: string;
-  modalidad: string;
-  precio: number;
-  limite: string;
-  nota?: string;
-  tipo: "local" | "vinculado" | "forastero";
-  comercial: boolean;
-  dias?: number;
-};
-
-export const TARIFAS: Tarifa[] = [
-  {
-    id: "local-temp",
-    recolector: "Empadronado (Local)",
-    modalidad: "Temporada (Recreativo o Comercial)",
-    precio: 15,
-    limite: "Hasta 5 kg/día (recreativo) o 100 kg/día (comercial)",
-    nota: "Exige empadronamiento de al menos 6 meses antes del inicio de la campaña general de otoño.",
-    tipo: "local",
-    comercial: false,
-  },
-  {
-    id: "vinc-rec",
-    recolector: "Vinculado",
-    modalidad: "Temporada (Recreativo)",
-    precio: 25,
-    limite: "Hasta 5 kg por persona y día",
-    tipo: "vinculado",
-    comercial: false,
-  },
-  {
-    id: "vinc-com",
-    recolector: "Vinculado",
-    modalidad: "Temporada (Comercial)",
-    precio: 50,
-    limite: "Hasta 100 kg por persona y día",
-    tipo: "vinculado",
-    comercial: true,
-  },
-  {
-    id: "for-2d",
-    recolector: "Forastero (General / Foráneo)",
-    modalidad: "2 Días (Recreativo)",
-    precio: 20,
-    limite: "Hasta 5 kg por persona y día",
-    tipo: "forastero",
-    comercial: false,
-    dias: 2,
-  },
-];
-
 export type Especie = {
   id: string;
   nombre: string;

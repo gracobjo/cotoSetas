@@ -41,3 +41,24 @@ export async function loadPermitsByEmail(
   const lower = email.trim().toLowerCase();
   return Object.values(store).filter((p) => p.email.toLowerCase() === lower);
 }
+
+export async function loadAllPermits(): Promise<StoredPermit[]> {
+  const store = await ensureStore();
+  return Object.values(store).sort(
+    (a, b) =>
+      new Date(b.emitidoEn).getTime() - new Date(a.emitidoEn).getTime()
+  );
+}
+
+export async function updatePermitStatus(
+  id: string,
+  status: StoredPermit["status"]
+): Promise<StoredPermit | null> {
+  const store = await ensureStore();
+  const permit = store[id];
+  if (!permit) return null;
+  permit.status = status;
+  store[id] = permit;
+  await writeStore(store);
+  return permit;
+}

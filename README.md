@@ -18,6 +18,43 @@ Stack: **Next.js 14 (App Router) · TypeScript · Tailwind · Shadcn/UI · Frame
 
 > Disclaimer: esta web es informativa. Los permisos y partes oficiales también se gestionan en [micocyl.es](https://www.micocyl.es/). El flujo de pago de esta demo es **simulado** hasta conectar Stripe/Redsys.
 
+## Documentación en línea
+
+Disponible en la propia aplicación:
+
+- Índice: `/documentacion`
+- Fuentes markdown en la carpeta `docs/`
+
+Incluye: manual de usuario, configuración, desarrollo, requisitos, casos de uso y diagramas UML.
+
+## Panel administrador
+
+URL: `/admin` (login en `/admin/login`)
+
+Variables en `.env.local`:
+
+```
+ADMIN_USER=admin
+ADMIN_PASSWORD=tu-password-segura
+ADMIN_SESSION_SECRET=secreto-largo-aleatorio
+```
+
+Permite:
+- Editar **contenido de la landing** (hero, intro HTML, footer, WhatsApp)
+- **CRUD de enlaces oficiales**
+- Editar precios, kg/día y activar/desactivar tarifas
+- Listar permisos emitidos (titular, email, DNI enmascarado, estado)
+- Revocar permisos
+
+## Seguridad (pautas OWASP)
+
+- Validación DNI/NIE con **letra de control** (cliente + servidor)
+- Sanitización y esquemas Zod en APIs
+- Rate limiting en login y compra
+- Sesión admin en cookie **httpOnly** + firma HMAC
+- Cabeceras: CSP, X-Frame-Options, nosniff, Referrer-Policy
+- El DNI no se almacena en claro (hash + máscara)
+
 ## Verificar el QR desde el móvil
 
 El QR apunta a `NEXT_PUBLIC_SITE_URL`. Si pone `localhost`, el teléfono **no** podrá abrirlo.

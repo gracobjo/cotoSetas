@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { LINKS, SITE } from "@/lib/content";
+import { SITE } from "@/lib/content";
+import { usePageContent } from "@/hooks/use-page-content";
 
 export function Footer() {
+  const { content } = usePageContent();
+  const links = content?.enlaces.items?.slice(0, 6) || [];
+  const disclaimer =
+    content?.footer.disclaimer ||
+    "Esta web es informativa y no oficial. Los permisos oficiales se gestionan también en micocyl.es.";
+
   return (
     <footer
       id="contacto"
@@ -10,9 +19,7 @@ export function Footer() {
       <div className="container-narrow section-padding !py-12">
         <div className="grid gap-10 md:grid-cols-3">
           <div>
-            <h3 className="font-display text-xl font-semibold">
-              {SITE.name}
-            </h3>
+            <h3 className="font-display text-xl font-semibold">{SITE.name}</h3>
             <p className="mt-2 text-sm text-white/70">
               {SITE.location}
               <br />
@@ -25,46 +32,18 @@ export function Footer() {
               Enlaces oficiales
             </h4>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
-              <li>
-                <a
-                  href={LINKS.micocyl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white"
-                >
-                  Micocyl
-                </a>
-              </li>
-              <li>
-                <a
-                  href={LINKS.micodata}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white"
-                >
-                  Visor Micodata
-                </a>
-              </li>
-              <li>
-                <a
-                  href={LINKS.appPlay}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white"
-                >
-                  App Micocyl (Google Play)
-                </a>
-              </li>
-              <li>
-                <a
-                  href={LINKS.adisac}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white"
-                >
-                  ADISAC – Rutas Villardeciervos
-                </a>
-              </li>
+              {links.map((l) => (
+                <li key={l.id}>
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white"
+                  >
+                    {l.title}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -84,30 +63,21 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="#alertas" className="hover:text-white">
-                  Alertas del parte
-                </a>
+                <Link href="/documentacion" className="hover:text-white">
+                  Documentación
+                </Link>
+              </li>
+              <li>
+                <Link href="/admin" className="hover:text-white">
+                  Administración
+                </Link>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-10 border-t border-white/15 pt-6 text-xs leading-relaxed text-white/55">
-          <p>
-            Esta web es informativa y no oficial. Los permisos y partes
-            oficiales del Parque Micológico se gestionan también a través de{" "}
-            <a
-              href={LINKS.micocyl}
-              className="underline hover:text-white"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              micocyl.es
-            </a>
-            . Los comprobantes emitidos aquí incluyen firma digital HMAC, código
-            de seguridad y QR verificable para inspección por vigilantes del
-            coto o SEPRONA.
-          </p>
+          <p>{disclaimer}</p>
           <p className="mt-2">
             © {new Date().getFullYear()} {SITE.name}. Sierra de la Culebra,
             Zamora.

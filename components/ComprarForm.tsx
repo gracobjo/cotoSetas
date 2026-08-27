@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Shield, Lock, QrCode, Mail, Loader2, Send } from "lucide-react";
-import { TARIFAS } from "@/lib/content";
+import type { Tarifa } from "@/lib/tarifas-store";
+import { validateDniNie } from "@/lib/dni";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,33 +35,55 @@ type PurchaseResult = {
     warnLocalhost: boolean;
     hint: string | null;
   };
+  error?: string;
 };
 
 export function ComprarForm() {
   const search = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
-  const initialTarifa = search.get("tarifa") || TARIFAS[3]!.id;
 
-  const [tarifaId, setTarifaId] = useState(initialTarifa);
+  const [tarifas, setTarifas] = useState<Tarifa[]>([]);
+  const [tarifaId, setTarifaId] = useState("");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [dni, setDni] = useState("");
+  const [dniError, setDniError] = useState<string | null>(null);
   const [acepta, setAcepta] = useState(false);
   const [enviarEmail, setEnviarEmail] = useState(true);
   const [enviarTelegram, setEnviarTelegram] = useState(true);
   const [telegramChatId, setTelegramChatId] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/tarifas");
+      const data = await res.json();
+      const list = (data.tarifas || []) as Tarifa[];
+      setTarifas(list);
+      const fromQuery = search.get("tarifa");
+      if (fromQuery && list.some((t) => t.id === fromQuery)) {
+        setTarifaId(fromQuery);
+      } else if (list[0]) {
+        setTarifaId(list[0].id);
+      }
+    })();
+  }, [search]);
+
   const tarifa = useMemo(
-    () => TARIFAS.find((t) => t.id === tarifaId) || TARIFAS[0]!,
-    [tarifaId]
+    () => tarifas.find((t) => t.id === tarifaId) || tarifas[0],
+    [tarifas, tarifaId]
   );
 
-  useEffect(() => {
-    const t = search.get("tarifa");
-    if (t && TARIFAS.some((x) => x.id === t)) setTarifaId(t);
-  }, [search]);
+  const onDniBlur = () => {
+    if (!dni.trim()) {
+      setDniError(null);
+      return;
+    }
+    const v = validateDniNie(dni);
+    setDniError(v.ok ? null : v.error);
+    if (v.ok) setDni(v.normalized);
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +95,18 @@ export function ComprarForm() {
       });
       return;
     }
+
+    const dniCheck = validateDniNie(dni);
+    if (!dniCheck.ok) {
+      setDniError(dniCheck.error);
+      toast({
+        title: "DNI/NIE incorrecto",
+        description: dniCheck.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/permisos/comprar", {
@@ -81,7 +116,7 @@ export function ComprarForm() {
           tarifaId,
           nombre,
           email,
-          dni,
+          dni: dniCheck.normalized,
           aceptaNormativa: acepta,
           enviarEmail,
           enviarTelegram,
@@ -116,7 +151,7 @@ export function ComprarForm() {
         parts.push(
           result.delivery?.email.mode === "simulated" ||
             result.email.mode === "simulated"
-            ? "Email simulado (configura RESEND_API_KEY)"
+            ? "Email simulado"
             : "Email enviado"
         );
       }
@@ -129,22 +164,13 @@ export function ComprarForm() {
         );
       }
       if (result.delivery?.warnLocalhost) {
-        parts.push(
-          "⚠️ QR con localhost: configura NEXT_PUBLIC_SITE_URL con tu IP LAN"
-        );
+        parts.push("⚠️ Configura NEXT_PUBLIC_SITE_URL para el QR móvil");
       }
 
-      toast({
-        title: "Permiso emitido",
-        description: parts.join(" · "),
-      });
-
+      toast({ title: "Permiso emitido", description: parts.join(" · ") });
       router.push(`/mi-permiso?id=${encodeURIComponent(result.permit.id)}`);
     } catch {
-      toast({
-        title: "Error de red",
-        variant: "destructive",
-      });
+      toast({ title: "Error de red", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -163,8 +189,9 @@ export function ComprarForm() {
             className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={tarifaId}
             onChange={(e) => setTarifaId(e.target.value)}
+            required
           >
-            {TARIFAS.map((t) => (
+            {tarifas.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.recolector} – {t.modalidad} ({t.precio} €)
               </option>
@@ -180,6 +207,8 @@ export function ComprarForm() {
             onChange={(e) => setNombre(e.target.value)}
             className="mt-1.5"
             required
+            minLength={2}
+            maxLength={120}
             autoComplete="name"
           />
         </div>
@@ -202,14 +231,23 @@ export function ComprarForm() {
           <Input
             id="dni"
             value={dni}
-            onChange={(e) => setDni(e.target.value)}
+            onChange={(e) => {
+              setDni(e.target.value.toUpperCase());
+              setDniError(null);
+            }}
+            onBlur={onDniBlur}
             className="mt-1.5 font-mono uppercase"
-            placeholder="12345678A"
+            placeholder="12345678Z"
             required
+            aria-invalid={Boolean(dniError)}
           />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Solo se guarda un hash y una máscara (****5678A).
-          </p>
+          {dniError ? (
+            <p className="mt-1 text-xs text-destructive">{dniError}</p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Se valida la letra de control. Solo se guarda hash + máscara.
+            </p>
+          )}
         </div>
 
         <fieldset className="space-y-3 rounded-md border p-4">
@@ -223,7 +261,7 @@ export function ComprarForm() {
               onChange={(e) => setEnviarEmail(e.target.checked)}
             />
             <Mail className="h-4 w-4 text-primary" />
-            Enviar por correo electrónico
+            Correo electrónico
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -232,7 +270,7 @@ export function ComprarForm() {
               onChange={(e) => setEnviarTelegram(e.target.checked)}
             />
             <Send className="h-4 w-4 text-primary" />
-            Enviar por Telegram (bot)
+            Telegram
           </label>
           {enviarTelegram && (
             <div>
@@ -244,10 +282,6 @@ export function ComprarForm() {
                 className="mt-1.5 font-mono"
                 placeholder="123456789"
               />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Habla con tu bot (/start) y mira el chat.id en getUpdates. Si
-                dejas vacío, se usa TELEGRAM_DEFAULT_CHAT_ID del .env.
-              </p>
             </div>
           )}
         </fieldset>
@@ -262,7 +296,6 @@ export function ComprarForm() {
           />
           <span>
             Acepto la normativa del coto y confirmo que los datos son correctos.
-            Mostraré el QR y el DNI al vigilante o SEPRONA.
           </span>
         </label>
 
@@ -271,7 +304,7 @@ export function ComprarForm() {
           variant="mushroom"
           size="lg"
           className="w-full"
-          disabled={loading}
+          disabled={loading || !tarifa}
         >
           {loading ? (
             <>
@@ -279,62 +312,59 @@ export function ComprarForm() {
               Emitiendo permiso…
             </>
           ) : (
-            <>Pagar {tarifa.precio} € y obtener permiso</>
+            <>Pagar {tarifa?.precio ?? "—"} € y obtener permiso</>
           )}
         </Button>
-
-        <p className="text-xs text-muted-foreground">
-          Pago simulado. Configura email/Telegram en el fichero{" "}
-          <code className="rounded bg-muted px-1">.env</code>.
-        </p>
       </form>
 
       <aside className="space-y-4 lg:col-span-2">
-        <div className="rounded-lg border bg-card p-5">
-          <h2 className="font-display text-xl font-semibold">Resumen</h2>
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">Recolector</dt>
-              <dd className="text-right font-medium">{tarifa.recolector}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">Modalidad</dt>
-              <dd className="text-right">{tarifa.modalidad}</dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">Límite</dt>
-              <dd className="max-w-[60%] text-right text-xs">{tarifa.limite}</dd>
-            </div>
-            <div className="flex justify-between border-t pt-3 text-base">
-              <dt className="font-medium">Total</dt>
-              <dd className="font-display text-2xl font-bold text-mushroom">
-                {tarifa.precio} €
-              </dd>
-            </div>
-          </dl>
-        </div>
+        {tarifa && (
+          <div className="rounded-lg border bg-card p-5">
+            <h2 className="font-display text-xl font-semibold">Resumen</h2>
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Recolector</dt>
+                <dd className="text-right font-medium">{tarifa.recolector}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Modalidad</dt>
+                <dd className="text-right">{tarifa.modalidad}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Límite</dt>
+                <dd className="max-w-[60%] text-right text-xs">{tarifa.limite}</dd>
+              </div>
+              <div className="flex justify-between border-t pt-3 text-base">
+                <dt className="font-medium">Total</dt>
+                <dd className="font-display text-2xl font-bold text-mushroom">
+                  {tarifa.precio} €
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
 
         <div className="rounded-lg border border-primary/25 bg-primary/5 p-5 text-sm">
           <h3 className="mb-3 flex items-center gap-2 font-semibold">
             <Shield className="h-4 w-4 text-primary" />
-            Seguridad anti-falsificación
+            Seguridad
           </h3>
           <ul className="space-y-2 text-muted-foreground">
             <li className="flex gap-2">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-              Firma HMAC-SHA256 + token en el QR
+              DNI con letra de control + hash
             </li>
             <li className="flex gap-2">
               <QrCode className="mt-0.5 h-4 w-4 shrink-0" />
-              Verificación online desde el móvil
+              Firma HMAC y QR verificable
             </li>
             <li className="flex gap-2">
               <Mail className="mt-0.5 h-4 w-4 shrink-0" />
-              Entrega por email y/o Telegram
+              Rate limit anti-abuso en la API
             </li>
           </ul>
           <Badge variant="secondary" className="mt-3">
-            Código de seguridad de 8 caracteres
+            Pautas OWASP aplicadas
           </Badge>
         </div>
 

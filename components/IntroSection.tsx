@@ -2,8 +2,12 @@
 
 import { motion } from "framer-motion";
 import { ShieldCheck, MapPin, Leaf } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 
 export function IntroSection() {
+  const { content } = usePageContent();
+  const intro = content?.intro;
+
   return (
     <section className="section-padding">
       <div className="container-narrow">
@@ -15,15 +19,20 @@ export function IntroSection() {
           className="mx-auto max-w-3xl text-center"
         >
           <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-            Corazón micológico de la Culebra
+            {intro?.title || "Corazón micológico de la Culebra"}
           </h2>
-          <p className="mt-5 text-muted-foreground leading-relaxed">
-            Villardeciervos se encuentra en pleno corazón de la Sierra de la
-            Culebra (Zamora), un enclave de enorme riqueza micológica gestionado
-            bajo la red oficial de Micocyl. La recolección en sus montes
-            públicos y pinares está estrictamente regulada, por lo que es
-            obligatorio obtener un pase antes de salir al campo.
-          </p>
+          {intro?.html ? (
+            <div
+              className="mt-5 space-y-3 text-muted-foreground leading-relaxed [&_a]:text-primary [&_a]:underline [&_p]:mb-3"
+              dangerouslySetInnerHTML={{ __html: intro.html }}
+            />
+          ) : (
+            <p className="mt-5 text-muted-foreground leading-relaxed">
+              Villardeciervos se encuentra en pleno corazón de la Sierra de la
+              Culebra (Zamora), un enclave de enorme riqueza micológica
+              gestionado bajo la red oficial de Micocyl.
+            </p>
+          )}
         </motion.div>
 
         <div className="mt-12 grid gap-8 sm:grid-cols-3">

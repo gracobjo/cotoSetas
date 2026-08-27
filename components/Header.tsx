@@ -14,6 +14,7 @@ const NAV = [
   { href: "#rutas", label: "Rutas" },
   { href: "#parte", label: "Parte Micológico" },
   { href: "#alertas", label: "Alertas" },
+  { href: "/documentacion", label: "Docs" },
   { href: "#contacto", label: "Contacto" },
 ];
 
@@ -36,15 +37,25 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
-          {NAV.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              {item.label}
-            </a>
-          ))}
+          {NAV.map((item) =>
+            item.href.startsWith("/") ? (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <a
+                key={item.href}
+                href={item.href}
+                className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {item.label}
+              </a>
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-1">
@@ -71,16 +82,27 @@ export function Header() {
         )}
       >
         <nav className="container-narrow flex flex-col gap-1 px-4 py-3">
-          {NAV.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className="rounded-md px-3 py-2 text-sm hover:bg-muted"
-            >
-              {item.label}
-            </a>
-          ))}
+          {NAV.map((item) =>
+            item.href.startsWith("/") ? (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="rounded-md px-3 py-2 text-sm hover:bg-muted"
+              >
+                {item.label}
+              </a>
+            )
+          )}
           <Button asChild variant="mushroom" className="mt-2">
             <Link href="/comprar" onClick={() => setOpen(false)}>
               Comprar permiso

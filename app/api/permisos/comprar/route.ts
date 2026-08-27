@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TARIFAS, SITE } from "@/lib/content";
+import { SITE } from "@/lib/content";
+import { getTarifaById } from "@/lib/tarifas-store";
 import {
   computeValidity,
   generatePermitId,
@@ -17,72 +18,70 @@ import { generateQrDataUrl } from "@/lib/email-template";
 import { sendPermitEmail } from "@/lib/email";
 import { sendPermitTelegram } from "@/lib/telegram";
 import { resolvePublicBaseUrl } from "@/lib/site-url";
+import { validateDniNie } from "@/lib/dni";
+import { purchaseSchema, sanitizeText } from "@/lib/security";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/permisos/comprar
- * Emite permiso firmado + QR y entrega por email y/o Telegram.
+ * Emite permiso firmado + QR. Validación DNI checksum + rate limit (OWASP).
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as {
-      tarifaId?: string;
-      nombre?: string;
-      email?: string;
-      dni?: string;
-      aceptaNormativa?: boolean;
-      enviarEmail?: boolean;
-      enviarTelegram?: boolean;
-      telegramChatId?: string;
-    };
-
-    const {
-      tarifaId,
-      nombre,
-      email,
-      dni,
-      aceptaNormativa,
-      enviarEmail = true,
-      enviarTelegram = false,
-      telegramChatId,
-    } = body;
-
-    if (!tarifaId || !nombre?.trim() || !email?.trim() || !dni?.trim()) {
+    const ip = clientIp(req);
+    const rl = rateLimit(`comprar:${ip}`, 10, 10 * 60 * 1000);
+    if (!rl.ok) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios" },
+        { error: "Demasiadas solicitudes. Inténtalo más tarde." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rl.retryAfterSec) },
+        }
+      );
+    }
+
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+    }
+
+    const parsed = purchaseSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Datos de compra inválidos",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    if (!aceptaNormativa) {
-      return NextResponse.json(
-        { error: "Debes aceptar la normativa del coto" },
-        { status: 400 }
-      );
-    }
+    const data = parsed.data;
+    const nombre = sanitizeText(data.nombre, 120);
+    const email = sanitizeText(data.email, 180).toLowerCase();
+    const telegramChatId = data.telegramChatId
+      ? sanitizeText(data.telegramChatId, 64)
+      : undefined;
 
-    if (!enviarEmail && !enviarTelegram) {
+    if (!data.enviarEmail && !data.enviarTelegram) {
       return NextResponse.json(
         { error: "Elige al menos un canal: email o Telegram" },
         { status: 400 }
       );
     }
 
-    const dniClean = dni.trim().toUpperCase().replace(/[\s-]/g, "");
-    if (!/^(\d{8}[A-Z]|[XYZ]\d{7}[A-Z])$/.test(dniClean)) {
-      return NextResponse.json(
-        { error: "DNI/NIE no válido" },
-        { status: 400 }
-      );
+    const dniCheck = validateDniNie(data.dni);
+    if (!dniCheck.ok) {
+      return NextResponse.json({ error: dniCheck.error }, { status: 400 });
     }
+    const dniClean = dniCheck.normalized;
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return NextResponse.json({ error: "Email no válido" }, { status: 400 });
-    }
-
-    const tarifa = TARIFAS.find((t) => t.id === tarifaId);
+    const tarifa = await getTarifaById(data.tarifaId);
     if (!tarifa) {
       return NextResponse.json(
-        { error: "Tarifa no encontrada" },
+        { error: "Tarifa no encontrada o inactiva" },
         { status: 404 }
       );
     }
@@ -100,8 +99,8 @@ export async function POST(req: NextRequest) {
       modalidad: tarifa.modalidad,
       precio: tarifa.precio,
       limite: tarifa.limite,
-      nombre: nombre.trim(),
-      email: email.trim().toLowerCase(),
+      nombre,
+      email,
       dniHash,
       dniMask: maskDni(dniClean),
       emitidoEn: new Date().toISOString(),
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
       ...payload,
       firma,
       status: "activo",
-      telegramChatId: telegramChatId?.trim() || undefined,
+      telegramChatId,
     };
 
     const token = encodePermitToken(stored);
@@ -128,17 +127,12 @@ export async function POST(req: NextRequest) {
 
     await savePermit(stored);
 
-    const emailResult = enviarEmail
+    const emailResult = data.enviarEmail
       ? await sendPermitEmail(stored, verifyUrl, qrDataUrl)
       : { sent: false, mode: "skipped" as const };
 
-    const telegramResult = enviarTelegram
-      ? await sendPermitTelegram(
-          stored,
-          verifyUrl,
-          qrDataUrl,
-          telegramChatId
-        )
+    const telegramResult = data.enviarTelegram
+      ? await sendPermitTelegram(stored, verifyUrl, qrDataUrl, telegramChatId)
       : { sent: false, mode: "disabled" as const };
 
     const warnLocalhost = /localhost|127\.0\.0\.1/i.test(baseUrl);
@@ -171,7 +165,7 @@ export async function POST(req: NextRequest) {
         baseUrl,
         warnLocalhost,
         hint: warnLocalhost
-          ? "El QR apunta a localhost: el móvil no podrá abrirlo. Pon tu IP LAN en NEXT_PUBLIC_SITE_URL (ej. http://10.x.x.x:3000) y reinicia."
+          ? "El QR apunta a localhost: configura NEXT_PUBLIC_SITE_URL con tu IP/dominio público."
           : null,
       },
       email: emailResult,

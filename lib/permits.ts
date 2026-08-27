@@ -1,9 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import type { Tarifa } from "./content";
+import type { Tarifa } from "@/lib/tarifas-store";
 import {
   loadPermit,
   loadPermitsByEmail,
+  loadAllPermits,
   persistPermit,
+  updatePermitStatus,
 } from "@/lib/permit-store";
 
 /**
@@ -248,4 +250,16 @@ export async function listPermitsByEmail(
   const fromDisk = await loadPermitsByEmail(email);
   for (const p of fromDisk) getPermitStore().set(p.id, p);
   return fromDisk;
+}
+
+export async function listAllPermits(): Promise<StoredPermit[]> {
+  const fromDisk = await loadAllPermits();
+  for (const p of fromDisk) getPermitStore().set(p.id, p);
+  return fromDisk;
+}
+
+export async function revokePermit(id: string): Promise<StoredPermit | null> {
+  const updated = await updatePermitStatus(id, "revocado");
+  if (updated) getPermitStore().set(id, updated);
+  return updated;
 }
