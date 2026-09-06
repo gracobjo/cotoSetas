@@ -36,13 +36,15 @@
   2. Introduce nombre, email y DNI/NIE.
   3. El sistema valida formato y letra de control.
   4. Elige canales de entrega y acepta normativa.
-  5. Confirma (pago simulado).
-  6. El sistema emite permiso firmado, genera QR corto (`/v/[id]?s=`) y lo persiste.
-  7. Registra la compra en el log de auditoría (titular, modalidad, importe, fecha).
+  5. Confirma y, si Stripe está configurado, paga en Checkout.
+  6. Tras cobro confirmado (webhook o página de éxito), el sistema emite permiso firmado, genera QR corto (`/v/[id]?s=`) y lo persiste.
+  7. Registra la compra en el log de auditoría (titular, modalidad, importe, pago, fecha).
   8. Redirige a “Mi permiso”.
 - **Flujos alternativos:**
   - DNI inválido → mensaje de error, no emite.
   - Rate limit → HTTP 429.
+  - Pago cancelado → vuelve a `/comprar` sin emitir.
+  - Sin `STRIPE_SECRET_KEY` → pago simulado (solo desarrollo).
   - Fallo de email → se informa; el ticket web sigue disponible.
 - **Postcondiciones:** Permiso `activo` almacenado; evento `compra` en auditoría; opcionalmente notificaciones enviadas.
 

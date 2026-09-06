@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DocsShell } from "@/components/docs/DocsShell";
 import { DOCS } from "@/lib/docs-meta";
 import { Button } from "@/components/ui/button";
+import { requireAdminSession } from "@/lib/require-admin-session";
 
 export const metadata: Metadata = {
   title: "Documentación | Villardeciervos Micología",
@@ -11,8 +12,11 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export default function DocumentacionIndexPage() {
+  requireAdminSession("/documentacion");
+
   return (
     <DocsShell>
       <h1 className="font-display text-3xl font-bold sm:text-4xl">
@@ -39,7 +43,7 @@ export default function DocumentacionIndexPage() {
 
       <div className="mt-8">
         <Button asChild variant="outline">
-          <Link href="/">Volver al inicio</Link>
+          <Link href="/admin">Volver al panel</Link>
         </Button>
       </div>
     </DocsShell>

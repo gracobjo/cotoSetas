@@ -1,30 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SITE } from "@/lib/content";
+import { randomBytes } from "crypto";
 import { getTarifaById } from "@/lib/tarifas-store";
-import {
-  computeValidity,
-  generatePermitId,
-  generateSecurityCode,
-  hashDni,
-  maskDni,
-  savePermit,
-  signPayload,
-  buildQrVerificationUrl,
-  type PermitPayload,
-  type StoredPermit,
-} from "@/lib/permits";
-import { generateQrDataUrl } from "@/lib/email-template";
-import { sendPermitEmail } from "@/lib/email";
-import { sendPermitTelegram } from "@/lib/telegram";
-import { resolvePublicBaseUrl } from "@/lib/site-url";
 import { validateDniNie } from "@/lib/dni";
 import { purchaseSchema, sanitizeText } from "@/lib/security";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { appendAudit, recordPurchaseDay } from "@/lib/audit-store";
+import { resolvePublicBaseUrl } from "@/lib/site-url";
+import {
+  eurosToCents,
+  getStripe,
+  isPaymentsSimulated,
+} from "@/lib/stripe";
+import {
+  savePendingOrder,
+  type PendingOrder,
+} from "@/lib/pending-orders";
+import { issuePermit, publicPermitView } from "@/lib/issue-permit";
 
 /**
  * POST /api/permisos/comprar
- * Emite permiso firmado + QR. Validación DNI checksum + rate limit (OWASP).
+ * - Con Stripe: crea Checkout Session y redirige (no emite hasta webhook/éxito).
+ * - Sin Stripe (o PAYMENTS_MODE=simulated): emite al instante (dev).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -86,117 +81,119 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { validoDesde, validoHasta } = computeValidity(tarifa);
-    const id = generatePermitId();
-    const codigo = generateSecurityCode();
-    const dniHash = await hashDni(dniClean);
+    // --- Pago real: Stripe Checkout ---
+    if (!isPaymentsSimulated()) {
+      const orderId = `ord_${randomBytes(12).toString("hex")}`;
+      const baseUrl = resolvePublicBaseUrl(req);
+      const order: PendingOrder = {
+        id: orderId,
+        tarifaId: tarifa.id,
+        nombre,
+        email,
+        dni: dniClean,
+        enviarEmail: Boolean(data.enviarEmail),
+        enviarTelegram: Boolean(data.enviarTelegram),
+        telegramChatId,
+        precio: tarifa.precio,
+        modalidad: tarifa.modalidad,
+        recolector: tarifa.recolector,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      };
 
-    const payload: PermitPayload = {
-      id,
-      codigo,
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: email,
+        locale: "es",
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "eur",
+              unit_amount: eurosToCents(tarifa.precio),
+              product_data: {
+                name: `Permiso micológico · ${tarifa.modalidad}`,
+                description: `${tarifa.recolector} · ${SITE_PARK_LABEL()} · ${tarifa.limite}`,
+              },
+            },
+          },
+        ],
+        metadata: {
+          orderId,
+          tarifaId: tarifa.id,
+        },
+        success_url: `${baseUrl}/comprar/exito?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/comprar?tarifa=${encodeURIComponent(tarifa.id)}&cancel=1`,
+      });
+
+      order.stripeSessionId = session.id;
+      await savePendingOrder(order);
+
+      if (!session.url) {
+        return NextResponse.json(
+          { error: "No se pudo iniciar el pago con Stripe" },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        pago: {
+          modo: "stripe",
+          checkoutUrl: session.url,
+          sessionId: session.id,
+          orderId,
+        },
+      });
+    }
+
+    // --- Modo simulado (dev / sin STRIPE_SECRET_KEY) ---
+    const result = await issuePermit({
       tarifaId: tarifa.id,
-      recolector: tarifa.recolector,
-      modalidad: tarifa.modalidad,
-      precio: tarifa.precio,
-      limite: tarifa.limite,
       nombre,
       email,
-      dniHash,
-      dniMask: maskDni(dniClean),
-      emitidoEn: new Date().toISOString(),
-      validoDesde,
-      validoHasta,
-      parque: `${SITE.parkName} (${SITE.parkCode})`,
-      municipio: SITE.location,
-    };
-
-    const firma = signPayload(payload);
-    const baseUrl = resolvePublicBaseUrl(req);
-
-    const stored: StoredPermit = {
-      ...payload,
-      firma,
-      status: "activo",
+      dniClean,
+      enviarEmail: Boolean(data.enviarEmail),
+      enviarTelegram: Boolean(data.enviarTelegram),
       telegramChatId,
-    };
-
-    // QR y enlaces con URL corta (fácil de escanear / abrir en móvil)
-    const verifyUrl = buildQrVerificationUrl(baseUrl, id, firma);
-    const qrDataUrl = await generateQrDataUrl(verifyUrl);
-    stored.qrDataUrl = qrDataUrl;
-
-    await savePermit(stored);
-
-    void appendAudit({
-      action: "compra",
-      permitId: stored.id,
-      codigo: stored.codigo,
-      nombre: stored.nombre,
-      email: stored.email,
-      dniMask: stored.dniMask,
-      recolector: stored.recolector,
-      modalidad: stored.modalidad,
-      precio: stored.precio,
-      tarifaId: stored.tarifaId,
-      status: stored.status,
-      ip: clientIp(req),
-      detail: `Compra ${stored.modalidad} · ${stored.precio} €`,
-    }).catch(() => undefined);
-    void recordPurchaseDay(new Date(stored.emitidoEn)).catch(() => undefined);
-
-    const emailResult = data.enviarEmail
-      ? await sendPermitEmail(stored, verifyUrl, qrDataUrl)
-      : { sent: false, mode: "skipped" as const };
-
-    const telegramResult = data.enviarTelegram
-      ? await sendPermitTelegram(stored, verifyUrl, qrDataUrl, telegramChatId)
-      : { sent: false, mode: "disabled" as const };
-
-    const warnLocalhost = /localhost|127\.0\.0\.1/i.test(baseUrl);
+      req,
+      ip,
+      payment: {
+        provider: "simulated",
+        amountCents: eurosToCents(tarifa.precio),
+        currency: "eur",
+      },
+    });
 
     return NextResponse.json({
       ok: true,
-      permit: {
-        id: stored.id,
-        codigo: stored.codigo,
-        nombre: stored.nombre,
-        email: stored.email,
-        dniMask: stored.dniMask,
-        recolector: stored.recolector,
-        modalidad: stored.modalidad,
-        precio: stored.precio,
-        limite: stored.limite,
-        validoDesde: stored.validoDesde,
-        validoHasta: stored.validoHasta,
-        parque: stored.parque,
-        municipio: stored.municipio,
-        emitidoEn: stored.emitidoEn,
-        firma: stored.firma,
-        qrDataUrl: stored.qrDataUrl,
-        status: stored.status,
-        verifyUrl,
-      },
+      permit: publicPermitView(result.permit, result.verifyUrl),
       delivery: {
-        email: emailResult,
-        telegram: telegramResult,
-        baseUrl,
-        warnLocalhost,
-        hint: warnLocalhost
+        email: result.delivery.email,
+        telegram: result.delivery.telegram,
+        baseUrl: result.baseUrl,
+        warnLocalhost: result.warnLocalhost,
+        hint: result.warnLocalhost
           ? "El QR apunta a localhost: configura NEXT_PUBLIC_SITE_URL con tu IP/dominio público."
           : null,
       },
-      email: emailResult,
+      email: result.delivery.email,
       pago: {
         modo: "simulado",
         mensaje:
-          "Pago simulado. Conecta Stripe o Redsys en producción antes de cobrar.",
+          "Pago simulado (sin STRIPE_SECRET_KEY o PAYMENTS_MODE=simulated). En producción configura Stripe.",
       },
     });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { error: "Error al emitir el permiso" },
+      { error: "Error al procesar la compra" },
       { status: 500 }
     );
   }
+}
+
+function SITE_PARK_LABEL(): string {
+  return "PMZA-50.001 · Villardeciervos";
 }

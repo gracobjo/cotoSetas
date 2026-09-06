@@ -136,13 +136,37 @@ New-NetFirewallRule -DisplayName "cotoSetas Next.js 3000" -Direction Inbound -Pr
 
 ---
 
-## 7. Pago real (pendiente de integración)
+## 7. Pagos con Stripe Checkout
 
-Hoy el cobro es simulado. Antes de firmar el permiso en producción:
+### Variables
 
-1. Stripe Checkout o Redsys.
-2. Emitir permiso solo tras `payment_intent.succeeded` (o equivalente).
-3. Registrar el ID de pago en el permiso (y en la auditoría).
+| Variable | Descripción |
+|----------|-------------|
+| `STRIPE_SECRET_KEY` | Clave secreta (`sk_test_…` / `sk_live_…`). Si falta → **pago simulado** |
+| `STRIPE_WEBHOOK_SECRET` | Secreto del endpoint `whsec_…` |
+| `PAYMENTS_MODE` | `simulated` fuerza emisión sin cobro (tests) |
+| `NEXT_PUBLIC_SITE_URL` | Obligatorio: success/cancel del Checkout |
+
+### Flujo
+
+1. `POST /api/permisos/comprar` crea un pedido pendiente y una **Checkout Session**.
+2. El usuario paga en Stripe.
+3. Webhook `POST /api/stripe/webhook` (`checkout.session.completed`) emite el permiso firmado.
+4. `/comprar/exito?session_id=` confirma vía `GET /api/permisos/por-sesion` (fallback si el webhook tarda).
+
+### Configurar webhook en Stripe
+
+- URL: `https://TU_DOMINIO/api/stripe/webhook`
+- Evento: `checkout.session.completed`
+- Copiar el signing secret a `STRIPE_WEBHOOK_SECRET` (Vercel + local con Stripe CLI)
+
+Local con CLI:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+El ID de pago (`paymentIntentId` / sesión) se guarda en el permiso y en la auditoría.
 
 ---
 
@@ -155,4 +179,5 @@ Hoy el cobro es simulado. Antes de firmar el permiso en producción:
 - [ ] Resend / Telegram probados
 - [ ] Admin puede entrar, ver Dashboard/KPIs y editar tarifas
 - [ ] Compra de prueba + verificación QR + aparece en auditoría
+- [ ] Stripe: claves + webhook `checkout.session.completed` en producción
 - [ ] Disclaimer legal visible en footer

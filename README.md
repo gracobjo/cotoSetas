@@ -16,7 +16,7 @@ Stack: **Next.js 14 (App Router) · TypeScript · Tailwind · Shadcn/UI · Frame
   - Email tipo entrada de espectáculo (Resend o simulado)
   - Pantalla móvil `/mi-permiso` para enseñar al vigilante o SEPRONA
 
-> Disclaimer: esta web es informativa. Los permisos y partes oficiales también se gestionan en [micocyl.es](https://www.micocyl.es/). El flujo de pago de esta demo es **simulado** hasta conectar Stripe/Redsys.
+> Disclaimer: esta web es informativa. Los permisos y partes oficiales también se gestionan en [micocyl.es](https://www.micocyl.es/). El cobro usa **Stripe Checkout** si configuras `STRIPE_SECRET_KEY`; sin clave, el pago es simulado (solo desarrollo).
 
 ## Documentación en línea
 
@@ -155,17 +155,15 @@ EMAIL_FROM=Permisos <noreply@tudominio.com>
 
 Sin API key, el envío se **simula** en consola del servidor y el ticket sigue disponible en `/mi-permiso`.
 
-### Pago real
+### Pagos (Stripe)
 
-En `app/api/permisos/comprar/route.ts`, integra Stripe Checkout o Redsys **antes** de emitir y firmar el permiso. Solo firma tras `payment_intent.succeeded` (o equivalente).
+Con `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`:
 
-### Persistencia
+1. La compra crea una **Checkout Session** y redirige a Stripe.
+2. El webhook `checkout.session.completed` (o `/comprar/exito`) emite el permiso firmado.
+3. Sin claves → pago simulado (emisión inmediata, solo desarrollo).
 
-El almacén actual es **en memoria** (`global.__permitStore`) — válido para demo. En producción usa:
-
-- Vercel Postgres / Neon
-- Vercel KV
-- Supabase
+Detalle en `docs/manual-configuracion.md` §7.
 
 ## Estructura
 

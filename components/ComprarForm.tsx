@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type PurchaseResult = {
   ok: boolean;
-  permit: {
+  permit?: {
     id: string;
     codigo: string;
     qrDataUrl?: string;
@@ -27,7 +27,12 @@ type PurchaseResult = {
     validoDesde: string;
     validoHasta: string;
   };
-  email: { sent: boolean; mode: string };
+  pago?: {
+    modo: "stripe" | "simulado";
+    checkoutUrl?: string;
+    mensaje?: string;
+  };
+  email?: { sent: boolean; mode: string };
   delivery?: {
     email: { sent: boolean; mode: string };
     telegram: { sent: boolean; mode: string; error?: string };
@@ -37,6 +42,17 @@ type PurchaseResult = {
   };
   error?: string;
 };
+
+function savePermitLocal(permit: NonNullable<PurchaseResult["permit"]>) {
+  localStorage.setItem("vdciervos_ultimo_permiso", JSON.stringify(permit));
+  const listRaw = localStorage.getItem("vdciervos_mis_permisos");
+  const list = listRaw ? (JSON.parse(listRaw) as unknown[]) : [];
+  list.unshift(permit);
+  localStorage.setItem(
+    "vdciervos_mis_permisos",
+    JSON.stringify(list.slice(0, 20))
+  );
+}
 
 export function ComprarForm() {
   const search = useSearchParams();
@@ -54,6 +70,15 @@ export function ComprarForm() {
   const [enviarTelegram, setEnviarTelegram] = useState(true);
   const [telegramChatId, setTelegramChatId] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (search.get("cancel") === "1") {
+      toast({
+        title: "Pago cancelado",
+        description: "No se ha cobrado nada. Puedes intentarlo de nuevo.",
+      });
+    }
+  }, [search, toast]);
 
   useEffect(() => {
     void (async () => {
@@ -123,7 +148,7 @@ export function ComprarForm() {
           telegramChatId: telegramChatId || undefined,
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as PurchaseResult;
       if (!res.ok) {
         toast({
           title: "No se pudo completar la compra",
@@ -133,42 +158,52 @@ export function ComprarForm() {
         return;
       }
 
-      const result = data as PurchaseResult;
-      localStorage.setItem(
-        "vdciervos_ultimo_permiso",
-        JSON.stringify(result.permit)
-      );
-      const listRaw = localStorage.getItem("vdciervos_mis_permisos");
-      const list = listRaw ? (JSON.parse(listRaw) as unknown[]) : [];
-      list.unshift(result.permit);
-      localStorage.setItem(
-        "vdciervos_mis_permisos",
-        JSON.stringify(list.slice(0, 20))
-      );
+      if (data.pago?.modo === "stripe" && data.pago.checkoutUrl) {
+        toast({
+          title: "Redirigiendo al pago",
+          description: "Te llevamos a Stripe Checkout de forma segura.",
+        });
+        window.location.href = data.pago.checkoutUrl;
+        return;
+      }
+
+      if (!data.permit) {
+        toast({
+          title: "Respuesta inesperada",
+          description: "No se recibió el permiso",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      savePermitLocal(data.permit);
 
       const parts: string[] = [];
       if (enviarEmail) {
         parts.push(
-          result.delivery?.email.mode === "simulated" ||
-            result.email.mode === "simulated"
+          data.delivery?.email.mode === "simulated" ||
+            data.email?.mode === "simulated"
             ? "Email simulado"
             : "Email enviado"
         );
       }
       if (enviarTelegram) {
-        const tg = result.delivery?.telegram;
+        const tg = data.delivery?.telegram;
         parts.push(
           tg?.sent
             ? "Telegram enviado"
             : `Telegram: ${tg?.error || tg?.mode || "no enviado"}`
         );
       }
-      if (result.delivery?.warnLocalhost) {
+      if (data.delivery?.warnLocalhost) {
         parts.push("⚠️ Configura NEXT_PUBLIC_SITE_URL para el QR móvil");
+      }
+      if (data.pago?.modo === "simulado") {
+        parts.push("Pago simulado (dev)");
       }
 
       toast({ title: "Permiso emitido", description: parts.join(" · ") });
-      router.push(`/mi-permiso?id=${encodeURIComponent(result.permit.id)}`);
+      router.push(`/mi-permiso?id=${encodeURIComponent(data.permit.id)}`);
     } catch {
       toast({ title: "Error de red", variant: "destructive" });
     } finally {
@@ -309,12 +344,16 @@ export function ComprarForm() {
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Emitiendo permiso…
+              Procesando…
             </>
           ) : (
             <>Pagar {tarifa?.precio ?? "—"} € y obtener permiso</>
           )}
         </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          Con cobro activo: pago seguro con tarjeta (Stripe). El permiso se
+          emite solo tras confirmar el pago.
+        </p>
       </form>
 
       <aside className="space-y-4 lg:col-span-2">
@@ -350,6 +389,10 @@ export function ComprarForm() {
             Seguridad
           </h3>
           <ul className="space-y-2 text-muted-foreground">
+            <li className="flex gap-2">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+              Cobro con Stripe Checkout (PCI)
+            </li>
             <li className="flex gap-2">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
               DNI con letra de control + hash

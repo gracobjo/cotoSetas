@@ -5,8 +5,12 @@ import path from "path";
 import { DocsShell } from "@/components/docs/DocsShell";
 import { MarkdownDoc } from "@/components/docs/MarkdownDoc";
 import { DOCS, getDoc, type DocSlug } from "@/lib/docs-meta";
+import { requireAdminSession } from "@/lib/require-admin-session";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
 
 type Props = { params: { slug: string } };
 
@@ -25,6 +29,8 @@ async function readDoc(file: string): Promise<string> {
 }
 
 export default async function DocPage({ params }: Props) {
+  requireAdminSession(`/documentacion/${params.slug}`);
+
   const doc = getDoc(params.slug);
   if (!doc) notFound();
 

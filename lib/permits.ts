@@ -44,6 +44,13 @@ export type StoredPermit = PermitPayload & {
   qrDataUrl?: string;
   status: "activo" | "revocado" | "caducado";
   telegramChatId?: string;
+  /** Cobro: stripe | simulated */
+  paymentProvider?: "stripe" | "simulated";
+  paymentSessionId?: string;
+  paymentIntentId?: string;
+  paymentAmountCents?: number;
+  paymentCurrency?: string;
+  paidAt?: string;
 };
 
 /** Enmascarar DNI: 12345678A → ****5678A */
