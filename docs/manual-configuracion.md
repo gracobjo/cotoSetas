@@ -79,8 +79,9 @@ Pestañas:
    - **CRUD de enlaces oficiales** (crear, editar, ordenar, activar, eliminar)
    - WhatsApp y disclaimer del footer
 3. **Tarifas:** precio, kg/día, modalidad, textos de detalle, activación, notas de campaña; botón **Restaurar oficiales Micocyl** (catálogo Zamora: general 20 € / 2 días, local/vinculado temporada)
-4. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar**
-5. Acceso a **Documentación** (`/documentacion`) desde el panel
+4. **Contrato / servicio:** ficha interna de gestión integral (web + soporte + alertas + admin): cliente, fechas, cuota, servicios incluidos, alcance y notas. No es pública.
+5. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar**
+6. Acceso a **Documentación** (`/documentacion`) desde el panel
 
 Con `DATABASE_URL` todo esto vive en Neon Postgres (no en ficheros locales).
 

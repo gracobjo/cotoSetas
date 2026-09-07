@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Tarifa, TarifasConfig } from "@/lib/tarifas-store";
 import type { PageContent } from "@/lib/content-store";
+import type { ContratoGestion } from "@/lib/contrato-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Save, Shield, Search, LayoutDashboard, RotateCcw } from "lucide-react";
 import { AdminContenidoForm } from "@/components/admin/AdminContenidoForm";
+import { AdminContratoForm } from "@/components/admin/AdminContratoForm";
 import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
 import { invalidatePageContentCache } from "@/hooks/use-page-content";
 
@@ -37,7 +39,7 @@ type PermitRow = {
   validoHasta: string;
 };
 
-type Tab = "dashboard" | "contenido" | "tarifas" | "permisos";
+type Tab = "dashboard" | "contrato" | "contenido" | "tarifas" | "permisos";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -46,6 +48,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [config, setConfig] = useState<TarifasConfig | null>(null);
   const [pageContent, setPageContent] = useState<PageContent | null>(null);
+  const [contrato, setContrato] = useState<ContratoGestion | null>(null);
   const [permits, setPermits] = useState<PermitRow[]>([]);
   const [q, setQ] = useState("");
   const [saving, setSaving] = useState(false);
@@ -72,6 +75,12 @@ export default function AdminDashboard() {
     setPageContent(await res.json());
   }, []);
 
+  const loadContrato = useCallback(async () => {
+    const res = await fetch("/api/admin/contrato");
+    if (!res.ok) return;
+    setContrato(await res.json());
+  }, []);
+
   const loadPermisos = useCallback(async (query = "") => {
     const res = await fetch(
       `/api/admin/permisos?q=${encodeURIComponent(query)}`
@@ -85,9 +94,10 @@ export default function AdminDashboard() {
     void loadMe().then(() => {
       void loadTarifas();
       void loadContenido();
+      void loadContrato();
       void loadPermisos();
     });
-  }, [loadMe, loadTarifas, loadContenido, loadPermisos]);
+  }, [loadMe, loadTarifas, loadContenido, loadContrato, loadPermisos]);
 
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -199,6 +209,44 @@ export default function AdminDashboard() {
     }
   };
 
+  const saveContrato = async () => {
+    if (!contrato) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/contrato", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cliente: contrato.cliente,
+          referencia: contrato.referencia,
+          estado: contrato.estado,
+          fechaInicio: contrato.fechaInicio,
+          fechaFin: contrato.fechaFin,
+          cuota: contrato.cuota,
+          periodicidad: contrato.periodicidad,
+          servicios: contrato.servicios,
+          alcance: contrato.alcance,
+          exclusiones: contrato.exclusiones,
+          contactoCliente: contrato.contactoCliente,
+          notasInternas: contrato.notasInternas,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: "Error al guardar contrato",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      setContrato(data.contrato);
+      toast({ title: "Contrato guardado" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const revoke = async (id: string) => {
     if (!confirm("¿Revocar este permiso?")) return;
     const res = await fetch("/api/admin/permisos", {
@@ -247,6 +295,7 @@ export default function AdminDashboard() {
           {(
             [
               ["dashboard", "Dashboard / KPIs"],
+              ["contrato", "Contrato / servicio"],
               ["contenido", "Contenido / Enlaces"],
               ["tarifas", "Tarifas"],
               ["permisos", "Permisos emitidos"],
@@ -267,6 +316,15 @@ export default function AdminDashboard() {
         </div>
 
         {tab === "dashboard" && <AdminStatsPanel />}
+
+        {tab === "contrato" && contrato && (
+          <AdminContratoForm
+            contrato={contrato}
+            onChange={setContrato}
+            onSave={() => void saveContrato()}
+            saving={saving}
+          />
+        )}
 
         {tab === "contenido" && pageContent && (
           <AdminContenidoForm
