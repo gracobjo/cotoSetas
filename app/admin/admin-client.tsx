@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Save, Shield, Search, LayoutDashboard } from "lucide-react";
+import { LogOut, Save, Shield, Search, LayoutDashboard, RotateCcw } from "lucide-react";
 import { AdminContenidoForm } from "@/components/admin/AdminContenidoForm";
 import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
 import { invalidatePageContentCache } from "@/hooks/use-page-content";
@@ -114,6 +114,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           notasCampania: config.notasCampania,
           tarifas: config.tarifas,
+          tarifasVersion: config.tarifasVersion ?? 2,
         }),
       });
       const data = await res.json();
@@ -127,6 +128,40 @@ export default function AdminDashboard() {
       }
       setConfig(data.config);
       toast({ title: "Tarifas guardadas" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetTarifasOficiales = async () => {
+    if (
+      !confirm(
+        "¿Restaurar las tarifas oficiales Micocyl de Zamora?\nSe sustituirán precio, modalidades y textos actuales."
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/tarifas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: "Error al restaurar",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      setConfig(data.config);
+      toast({
+        title: "Tarifas restauradas",
+        description: "Valores oficiales Micocyl Zamora aplicados.",
+      });
     } finally {
       setSaving(false);
     }
@@ -244,6 +279,12 @@ export default function AdminDashboard() {
 
         {tab === "tarifas" && config && (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Edita precios, límites y textos explicativos. En público se muestra
+              una guía de tipos (local / vinculado / general, recreativo vs
+              comercial, duración). Puedes restaurar los valores oficiales
+              Micocyl Zamora si lo necesitas.
+            </p>
             <div>
               <Label htmlFor="notas">Notas de campaña (públicas)</Label>
               <textarea
@@ -255,74 +296,116 @@ export default function AdminDashboard() {
                 }
               />
             </div>
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Recolector</TableHead>
-                    <TableHead>Modalidad</TableHead>
-                    <TableHead>Precio €</TableHead>
-                    <TableHead>Kg/día</TableHead>
-                    <TableHead>Activa</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {config.tarifas.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="text-sm">
-                        {t.recolector}
-                        <div className="text-xs text-muted-foreground">
-                          {t.tipo}
-                          {t.comercial ? " · comercial" : ""}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{t.modalidad}</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="w-24"
-                          value={t.precio}
-                          onChange={(e) =>
-                            updateTarifa(t.id, {
-                              precio: Number(e.target.value),
-                            })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={1}
-                          className="w-20"
-                          value={t.limiteKg}
-                          onChange={(e) => {
-                            const kg = Number(e.target.value);
-                            updateTarifa(t.id, {
-                              limiteKg: kg,
-                              limite: `Hasta ${kg} kg por persona y día`,
-                            });
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={t.activa}
-                          onChange={(e) =>
-                            updateTarifa(t.id, { activa: e.target.checked })
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {config.tarifas.map((t) => (
+                <div
+                  key={t.id}
+                  className="space-y-3 rounded-lg border bg-card p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{t.recolector}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.tipo}
+                        {t.comercial ? " · comercial" : " · recreativo"}
+                        {t.dias ? ` · ${t.dias} día(s)` : " · temporada"}
+                        {" · "}
+                        <span className="font-mono">{t.id}</span>
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={t.activa}
+                        onChange={(e) =>
+                          updateTarifa(t.id, { activa: e.target.checked })
+                        }
+                      />
+                      Activa (visible al público)
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <Label>Modalidad / duración</Label>
+                      <Input
+                        className="mt-1.5"
+                        value={t.modalidad}
+                        onChange={(e) =>
+                          updateTarifa(t.id, { modalidad: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Precio €</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className="mt-1.5"
+                        value={t.precio}
+                        onChange={(e) =>
+                          updateTarifa(t.id, {
+                            precio: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Kg / persona / día</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        className="mt-1.5"
+                        value={t.limiteKg}
+                        onChange={(e) => {
+                          const kg = Number(e.target.value);
+                          updateTarifa(t.id, {
+                            limiteKg: kg,
+                            limite: `Hasta ${kg} kg por persona y día`,
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label>Recolector (etiqueta)</Label>
+                      <Input
+                        className="mt-1.5"
+                        value={t.recolector}
+                        onChange={(e) =>
+                          updateTarifa(t.id, { recolector: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Detalle público (diferencias / requisitos)</Label>
+                    <textarea
+                      className="mt-1.5 min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={t.nota || ""}
+                      onChange={(e) =>
+                        updateTarifa(t.id, { nota: e.target.value })
+                      }
+                      placeholder="Quién puede comprarlo, duración, requisitos…"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-            <Button onClick={saveTarifas} variant="mushroom" disabled={saving}>
-              <Save className="h-4 w-4" />
-              {saving ? "Guardando…" : "Guardar tarifas"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveTarifas} variant="mushroom" disabled={saving}>
+                <Save className="h-4 w-4" />
+                {saving ? "Guardando…" : "Guardar tarifas"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void resetTarifasOficiales()}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restaurar oficiales Micocyl
+              </Button>
+            </div>
           </div>
         )}
 

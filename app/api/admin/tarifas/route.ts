@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import {
   getTarifasConfig,
+  resetTarifasToDefault,
   saveTarifasConfig,
 } from "@/lib/tarifas-store";
 import { tarifasConfigSchema } from "@/lib/security";
@@ -46,10 +47,32 @@ export async function PUT(req: NextRequest) {
     {
       notasCampania: parsed.data.notasCampania,
       tarifas: parsed.data.tarifas,
+      tarifasVersion: parsed.data.tarifasVersion ?? 2,
       updatedAt: new Date().toISOString(),
     },
     auth.sub
   );
 
   return NextResponse.json({ ok: true, config: saved });
+}
+
+/** POST /api/admin/tarifas — restaurar tarifas oficiales Micocyl Zamora */
+export async function POST(req: NextRequest) {
+  const auth = requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
+
+  let action = "reset";
+  try {
+    const body = (await req.json()) as { action?: string };
+    if (body?.action) action = body.action;
+  } catch {
+    // body opcional
+  }
+
+  if (action !== "reset") {
+    return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
+  }
+
+  const config = await resetTarifasToDefault(auth.sub);
+  return NextResponse.json({ ok: true, config });
 }

@@ -380,6 +380,11 @@ export function ComprarForm() {
                 </dd>
               </div>
             </dl>
+            {tarifa.nota && (
+              <p className="mt-4 border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+                {tarifa.nota}
+              </p>
+            )}
           </div>
         )}
 

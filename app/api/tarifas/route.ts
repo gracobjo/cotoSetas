@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getTarifasConfig, getTarifasActivas } from "@/lib/tarifas-store";
+import {
+  getTarifasConfig,
+  getTarifasActivas,
+  GUIA_TIPOS_PERMISO,
+} from "@/lib/tarifas-store";
 
 /** GET /api/tarifas — listado público de tarifas activas */
 export async function GET() {
@@ -11,5 +15,6 @@ export async function GET() {
     notasCampania: config.notasCampania,
     updatedAt: config.updatedAt,
     tarifas: activas,
+    guiaTipos: GUIA_TIPOS_PERMISO,
   });
 }

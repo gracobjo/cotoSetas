@@ -74,10 +74,10 @@
 - **Precondiciones:** Sesión admin válida.
 - **Flujo principal:**
   1. Admin entra en `/admin` → pestaña Tarifas.
-  2. Modifica precios / kg / activación / notas.
-  3. Guarda.
-  4. La API pública `/api/tarifas` refleja los cambios.
-- **Postcondiciones:** `data/tarifas.json` actualizado.
+  2. Modifica precios, kg/día, modalidad, textos de detalle y activación.
+  3. Guarda (o restaura el catálogo oficial Micocyl Zamora).
+  4. La API pública `/api/tarifas` refleja los cambios y la guía de tipos.
+- **Postcondiciones:** Configuración de tarifas actualizada (Neon o `data/tarifas.json`).
 
 ### CU-10b Gestionar contenido y enlaces
 

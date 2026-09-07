@@ -23,11 +23,14 @@ const FILTROS = [
   { id: "general", label: "General" },
 ] as const;
 
+type GuiaItem = { id: string; titulo: string; texto: string };
+
 export function TarifasTable() {
   const [filtro, setFiltro] =
     useState<(typeof FILTROS)[number]["id"]>("todos");
   const [tarifas, setTarifas] = useState<Tarifa[]>([]);
   const [notas, setNotas] = useState("");
+  const [guia, setGuia] = useState<GuiaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +40,7 @@ export function TarifasTable() {
         const data = await res.json();
         setTarifas(data.tarifas || []);
         setNotas(data.notasCampania || "");
+        setGuia(data.guiaTipos || []);
       } catch {
         setTarifas([]);
       } finally {
@@ -58,13 +62,29 @@ export function TarifasTable() {
           className="mb-8 max-w-3xl"
         >
           <h2 className="font-display text-3xl font-bold sm:text-4xl">
-            Tarifas oficiales Micocyl
+            Tarifas y tipos de permiso
           </h2>
           <p className="mt-3 text-muted-foreground">
             {notas ||
               "Parque Micológico Montes del Noroeste Zamorano (PMZA-50.001). Precios editables por el administrador del coto."}
           </p>
         </motion.div>
+
+        {guia.length > 0 && (
+          <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {guia.map((g) => (
+              <div
+                key={g.id}
+                className="border-l-2 border-primary/40 pl-4"
+              >
+                <h3 className="font-display text-base font-semibold">
+                  {g.titulo}
+                </h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{g.texto}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mb-6 flex flex-wrap gap-2">
           {FILTROS.map((f) => (
@@ -95,14 +115,14 @@ export function TarifasTable() {
                     <TableHead>Tipo de recolector</TableHead>
                     <TableHead>Modalidad / Duración</TableHead>
                     <TableHead>Precio</TableHead>
-                    <TableHead>Límite</TableHead>
+                    <TableHead>Límite y detalle</TableHead>
                     <TableHead className="text-right">Acción</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filas.map((t) => (
                     <TableRow key={t.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium align-top">
                         {t.recolector}
                         {t.comercial && (
                           <Badge variant="mushroom" className="ml-2">
@@ -110,14 +130,19 @@ export function TarifasTable() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell>{t.modalidad}</TableCell>
-                      <TableCell className="font-display text-lg font-semibold text-mushroom">
+                      <TableCell className="align-top">{t.modalidad}</TableCell>
+                      <TableCell className="align-top font-display text-lg font-semibold text-mushroom">
                         {t.precio} €
                       </TableCell>
-                      <TableCell className="max-w-xs text-muted-foreground">
-                        {t.limite}
+                      <TableCell className="max-w-sm align-top text-sm text-muted-foreground">
+                        <p>{t.limite}</p>
+                        {t.nota && (
+                          <p className="mt-1.5 text-xs leading-relaxed">
+                            {t.nota}
+                          </p>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right align-top">
                         <Button asChild size="sm" variant="mushroom">
                           <Link href={`/comprar?tarifa=${t.id}`}>Comprar</Link>
                         </Button>
@@ -140,6 +165,11 @@ export function TarifasTable() {
                       <p className="text-sm text-muted-foreground">
                         {t.modalidad}
                       </p>
+                      {t.comercial && (
+                        <Badge variant="mushroom" className="mt-1">
+                          Comercial
+                        </Badge>
+                      )}
                     </div>
                     <p className="font-display text-xl font-bold text-mushroom">
                       {t.precio} €
@@ -147,7 +177,9 @@ export function TarifasTable() {
                   </div>
                   <p className="mt-3 text-sm text-muted-foreground">{t.limite}</p>
                   {t.nota && (
-                    <p className="mt-1 text-xs text-muted-foreground">{t.nota}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                      {t.nota}
+                    </p>
                   )}
                   <Button asChild variant="mushroom" className="mt-4 w-full">
                     <Link href={`/comprar?tarifa=${t.id}`}>Comprar permiso</Link>

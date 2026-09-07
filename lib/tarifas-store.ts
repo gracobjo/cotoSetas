@@ -9,6 +9,7 @@ export type Tarifa = {
   precio: number;
   limite: string;
   limiteKg: number;
+  /** Texto corto: a quién va dirigido y qué incluye. */
   nota?: string;
   tipo: "local" | "vinculado" | "general";
   comercial: boolean;
@@ -19,6 +20,8 @@ export type Tarifa = {
 export type TarifasConfig = {
   updatedAt: string;
   updatedBy?: string;
+  /** 2 = set oficial Micocyl Zamora 2026 (sin permiso general de 1 día). */
+  tarifasVersion?: number;
   notasCampania: string;
   tarifas: Tarifa[];
 };
@@ -27,66 +30,56 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const FILE = path.join(DATA_DIR, "tarifas.json");
 const KV_KEY = "tarifas";
 
-/** Tarifas base campaña actual (PMZA-50.001 / Zamora) según rangos Micocyl CyL. */
+/**
+ * Tarifas oficiales PMZA-50.001 / ZA-50.024 (campaña Micocyl Zamora).
+ * Fuente: micocyl.es — no hay permiso general de 1 día; general = 20 € / 2 días.
+ */
 export const DEFAULT_TARIFAS: Tarifa[] = [
   {
-    id: "gen-1d",
-    recolector: "General (Visitante)",
-    modalidad: "1 Día (Recreativo)",
-    precio: 5,
-    limite: "Hasta 5 kg por persona y día",
-    limiteKg: 5,
-    nota: "Sin empadronamiento ni propiedades en el acotado.",
-    tipo: "general",
-    comercial: false,
-    dias: 1,
-    activa: true,
-  },
-  {
     id: "gen-2d",
-    recolector: "General (Visitante)",
-    modalidad: "2 Días (Recreativo)",
+    recolector: "General (visitante)",
+    modalidad: "2 días consecutivos (recreativo)",
     precio: 20,
     limite: "Hasta 5 kg por persona y día",
     limiteKg: 5,
-    nota: "Rango CyL 8–20 €; en Zamora se aplica 20 €.",
+    nota: "Cualquier persona sin empadronamiento ni vínculo en el acotado. Válido dos días seguidos (p. ej. fin de semana). No hay permiso general de 1 día ni de temporada en este parque.",
     tipo: "general",
     comercial: false,
     dias: 2,
     activa: true,
   },
   {
-    id: "gen-temp-rec",
-    recolector: "General (Visitante)",
-    modalidad: "Temporada (Recreativo)",
-    precio: 40,
+    id: "local-temp-rec",
+    recolector: "Local (empadronado)",
+    modalidad: "Temporada (recreativo)",
+    precio: 15,
     limite: "Hasta 5 kg por persona y día",
     limiteKg: 5,
-    nota: "Rango CyL 30–40 € según zona.",
-    tipo: "general",
+    nota: "Empadronado en un municipio del parque o del acotado de ampliación (suele exigirse antigüedad mínima). Válido toda la temporada micológica (hasta el cierre oficial Micocyl).",
+    tipo: "local",
     comercial: false,
     activa: true,
   },
   {
-    id: "gen-temp-com",
-    recolector: "General (Visitante)",
-    modalidad: "Temporada (Comercial)",
-    precio: 150,
-    limite: "Hasta 100 kg por persona y día (según zona 20–100 kg)",
+    id: "local-temp-com",
+    recolector: "Local (empadronado)",
+    modalidad: "Temporada (comercial)",
+    precio: 15,
+    limite: "Hasta 100 kg por persona y día",
     limiteKg: 100,
-    nota: "Rango CyL 70–240 € por temporada.",
-    tipo: "general",
+    nota: "Misma tarifa bonificada local, con cupo comercial. Requiere acreditar empadronamiento. Uso para venta/aprovechamiento comercial según normativa.",
+    tipo: "local",
     comercial: true,
     activa: true,
   },
   {
     id: "vinc-temp-rec",
     recolector: "Vinculado",
-    modalidad: "Temporada (Recreativo)",
+    modalidad: "Temporada (recreativo)",
     precio: 25,
     limite: "Hasta 5 kg por persona y día",
     limiteKg: 5,
-    nota: "Vínculos familiares, segunda residencia u otras situaciones del ayuntamiento. Rango ~15–25 €.",
+    nota: "No empadronado, pero con vínculo: propiedad en el municipio (IBI/tasa), nacido allí, o familiar de 1.er grado empadronado/vinculado. Toda la temporada.",
     tipo: "vinculado",
     comercial: false,
     activa: true,
@@ -94,36 +87,12 @@ export const DEFAULT_TARIFAS: Tarifa[] = [
   {
     id: "vinc-temp-com",
     recolector: "Vinculado",
-    modalidad: "Temporada (Comercial)",
+    modalidad: "Temporada (comercial)",
     precio: 50,
     limite: "Hasta 100 kg por persona y día",
     limiteKg: 100,
-    nota: "Aproximadamente 50 € en zonas reguladas.",
+    nota: "Misma condición de vinculado, con cupo comercial (hasta 100 kg/día). Toda la temporada.",
     tipo: "vinculado",
-    comercial: true,
-    activa: true,
-  },
-  {
-    id: "local-temp-rec",
-    recolector: "Local (Empadronado)",
-    modalidad: "Temporada (Recreativo)",
-    precio: 5,
-    limite: "Hasta 5 kg por persona y día",
-    limiteKg: 5,
-    nota: "Empadronados del territorio. Rango CyL 3–5 €. Suele exigirse empadronamiento previo a la campaña.",
-    tipo: "local",
-    comercial: false,
-    activa: true,
-  },
-  {
-    id: "local-temp-com",
-    recolector: "Local (Empadronado)",
-    modalidad: "Temporada (Comercial)",
-    precio: 10,
-    limite: "Hasta 100 kg por persona y día",
-    limiteKg: 100,
-    nota: "Reducciones locales; en algunas comarcas ~10 €.",
-    tipo: "local",
     comercial: true,
     activa: true,
   },
@@ -131,10 +100,45 @@ export const DEFAULT_TARIFAS: Tarifa[] = [
 
 export const DEFAULT_CONFIG: TarifasConfig = {
   updatedAt: new Date().toISOString(),
+  tarifasVersion: 2,
   notasCampania:
-    "Tarifas Micocyl CyL: varían por acotado, uso (recreativo/comercial) y vinculación (local, vinculado, general). Recreativo máx. 5 kg/persona/día; comercial 20–100 kg/día según zona. Valores editables por el administrador del coto.",
+    "Parque Micológico Montes del Noroeste Zamorano (PMZA-50.001) y acotado de ampliación (ZA-50.024). Un solo permiso vale en ambos. Precios alineados con Micocyl; el administrador del coto puede ajustarlos.",
   tarifas: DEFAULT_TARIFAS,
 };
+
+/** Guía pública: qué diferencia a cada tipo de recolector / modalidad. */
+export const GUIA_TIPOS_PERMISO = [
+  {
+    id: "general",
+    titulo: "General (visitante)",
+    texto:
+      "Quien no está empadronado ni tiene vínculo con los municipios del acotado. En Zamora la modalidad oficial es de 2 días consecutivos (20 € recreativo). No existe permiso general de 1 día ni de temporada en este parque.",
+  },
+  {
+    id: "local",
+    titulo: "Local (empadronado)",
+    texto:
+      "Empadronado en un municipio del parque o del acotado de ampliación. Tarifa bonificada de temporada (recreativo o comercial). Suele acreditarse en el ayuntamiento o con documentación de empadronamiento.",
+  },
+  {
+    id: "vinculado",
+    titulo: "Vinculado",
+    texto:
+      "No empadronado, pero con vínculo: propiedad (IBI/tasa a su nombre), nacimiento en el municipio, o familiar de primer grado empadronado/vinculado. Temporada a precio intermedio.",
+  },
+  {
+    id: "recreativo-comercial",
+    titulo: "Recreativo vs comercial",
+    texto:
+      "Recreativo: máximo habitual 5 kg por persona y día, consumo propio. Comercial: cupo mayor (hasta 100 kg/día) para aprovechamiento comercial, sujeto a la normativa del coto.",
+  },
+  {
+    id: "duracion",
+    titulo: "Duración",
+    texto:
+      "2 días: dos jornadas consecutivas a elegir. Temporada: desde la emisión hasta el cierre oficial de campaña Micocyl (normalmente 31 de julio). El límite de kg es por día, no por todo el permiso.",
+  },
+] as const;
 
 async function ensureFile(): Promise<TarifasConfig> {
   try {
@@ -152,11 +156,21 @@ async function ensureFile(): Promise<TarifasConfig> {
 async function loadConfig(): Promise<TarifasConfig> {
   if (hasDatabase()) {
     const fromDb = await kvGet<TarifasConfig>(KV_KEY);
-    if (fromDb?.tarifas?.length) return fromDb;
+    if (fromDb?.tarifas?.length) {
+      // Una sola vez: pasar del catálogo antiguo (1 día / temporada general) al oficial Zamora 2026
+      if ((fromDb.tarifasVersion ?? 1) < 2) {
+        return saveTarifasConfig(DEFAULT_CONFIG, "migration-v2");
+      }
+      return fromDb;
+    }
     await kvSet(KV_KEY, DEFAULT_CONFIG);
     return DEFAULT_CONFIG;
   }
-  return ensureFile();
+  const fileCfg = await ensureFile();
+  if ((fileCfg.tarifasVersion ?? 1) < 2) {
+    return saveTarifasConfig(DEFAULT_CONFIG, "migration-v2");
+  }
+  return fileCfg;
 }
 
 export async function getTarifasConfig(): Promise<TarifasConfig> {
@@ -189,4 +203,17 @@ export async function saveTarifasConfig(
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FILE, JSON.stringify(next, null, 2), "utf8");
   return next;
+}
+
+/** Sustituye la configuración por los defaults oficiales Micocyl Zamora. */
+export async function resetTarifasToDefault(
+  updatedBy?: string
+): Promise<TarifasConfig> {
+  return saveTarifasConfig(
+    {
+      ...DEFAULT_CONFIG,
+      updatedAt: new Date().toISOString(),
+    },
+    updatedBy
+  );
 }

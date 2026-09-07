@@ -27,11 +27,11 @@ export const adminLoginSchema = z.object({
 export const tarifaSchema = z.object({
   id: z.string().min(1).max(64),
   recolector: z.string().min(1).max(120),
-  modalidad: z.string().min(1).max(120),
+  modalidad: z.string().min(1).max(160),
   precio: z.number().min(0).max(10000),
   limite: z.string().min(1).max(300),
   limiteKg: z.number().int().min(1).max(500),
-  nota: z.string().max(500).optional(),
+  nota: z.string().max(800).optional(),
   tipo: z.enum(["local", "vinculado", "general"]),
   comercial: z.boolean(),
   dias: z.number().int().min(1).max(366).optional(),
@@ -40,5 +40,6 @@ export const tarifaSchema = z.object({
 
 export const tarifasConfigSchema = z.object({
   notasCampania: z.string().max(2000),
+  tarifasVersion: z.number().int().min(1).max(100).optional(),
   tarifas: z.array(tarifaSchema).min(1).max(50),
 });
