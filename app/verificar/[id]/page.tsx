@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -14,6 +14,7 @@ import {
   ShieldX,
   ArrowLeft,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -23,6 +24,7 @@ type VerifyResponse = {
   status?: string;
   error?: string;
   code?: string;
+  checkedAt?: string;
   antiForgery?: {
     hmacValid: boolean;
     qrBound: boolean;
@@ -42,38 +44,71 @@ type VerifyResponse = {
     parque: string;
     municipio: string;
     emitidoEn: string;
+    status?: string;
     firmaPreview: string;
   };
 };
+
+const POLL_MS = 12_000;
 
 function VerificarInner() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const [data, setData] = useState<VerifyResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const id = params.id;
-    const sig = search.get("sig") || "";
-    if (!id) return;
-
-    void (async () => {
-      setLoading(true);
+  const runVerify = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const id = params.id;
+      if (!id) return;
+      const silent = opts?.silent;
+      if (silent) setRefreshing(true);
+      else setLoading(true);
       try {
+        const sig = search.get("sig") || "";
         const token = search.get("t") || "";
         const qs = new URLSearchParams();
-        if (id) qs.set("id", id);
+        qs.set("id", id);
         if (sig) qs.set("sig", sig);
         if (token) qs.set("t", token);
-        const res = await fetch(`/api/permisos/verificar?${qs.toString()}`);
+        const res = await fetch(`/api/permisos/verificar?${qs.toString()}`, {
+          cache: "no-store",
+        });
         setData((await res.json()) as VerifyResponse);
       } catch {
-        setData({ valid: false, error: "Error de red al verificar" });
+        if (!silent) {
+          setData({ valid: false, error: "Error de red al verificar" });
+        }
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
-    })();
-  }, [params.id, search]);
+    },
+    [params.id, search]
+  );
+
+  useEffect(() => {
+    void runVerify();
+  }, [runVerify]);
+
+  useEffect(() => {
+    const tick = () => void runVerify({ silent: true });
+    const id = window.setInterval(tick, POLL_MS);
+    const onVis = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    const onFocus = () => tick();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [runVerify]);
+
+  const revoked = data?.status === "revocado";
 
   return (
     <main className="section-padding">
@@ -85,13 +120,29 @@ function VerificarInner() {
           </Link>
         </Button>
 
-        <h1 className="font-display text-3xl font-bold">
-          Verificación de permiso
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Panel para vigilantes del coto y SEPRONA. Comprueba autenticidad y
-          vigencia.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-bold">
+              Verificación de permiso
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Panel para vigilantes del coto y SEPRONA. El estado se actualiza
+              automáticamente (incl. revocaciones).
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading || refreshing}
+            onClick={() => void runVerify({ silent: true })}
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Actualizar
+          </Button>
+        </div>
 
         {loading && (
           <div className="mt-10 flex items-center justify-center gap-2 text-muted-foreground">
@@ -129,17 +180,56 @@ function VerificarInner() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 p-5">
-                <ShieldAlert className="h-8 w-8 shrink-0 text-amber-600" />
+              <div
+                className={`flex items-start gap-3 rounded-lg border-2 p-5 ${
+                  revoked
+                    ? "border-destructive/50 bg-destructive/10"
+                    : "border-amber-500/40 bg-amber-500/10"
+                }`}
+              >
+                {revoked ? (
+                  <ShieldX className="h-8 w-8 shrink-0 text-destructive" />
+                ) : (
+                  <ShieldAlert className="h-8 w-8 shrink-0 text-amber-600" />
+                )}
                 <div>
-                  <h2 className="font-display text-xl font-bold text-amber-700 dark:text-amber-400">
-                    NO VÁLIDO / NO VIGENTE
+                  <h2
+                    className={`font-display text-xl font-bold ${
+                      revoked
+                        ? "text-destructive"
+                        : "text-amber-700 dark:text-amber-400"
+                    }`}
+                  >
+                    {revoked
+                      ? "PERMISO REVOCADO"
+                      : "NO VÁLIDO / NO VIGENTE"}
                   </h2>
                   <p className="mt-1 text-sm">
-                    {data.error || `Estado: ${data.status || "desconocido"}`}
+                    {revoked
+                      ? "Este permiso ha sido anulado por el administrador del coto. No autoriza la recolección."
+                      : data.error ||
+                        `Estado: ${data.status || "desconocido"}`}
                   </p>
+                  {data.status && (
+                    <Badge
+                      variant={revoked ? "destructive" : "warning"}
+                      className="mt-2"
+                    >
+                      {data.status}
+                    </Badge>
+                  )}
                 </div>
               </div>
+            )}
+
+            {data.checkedAt && (
+              <p className="text-xs text-muted-foreground">
+                Última comprobación:{" "}
+                {format(new Date(data.checkedAt), "d MMM yyyy HH:mm:ss", {
+                  locale: es,
+                })}
+                {refreshing ? " · actualizando…" : ""}
+              </p>
             )}
 
             {data.permit && (

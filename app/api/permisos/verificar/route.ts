@@ -8,6 +8,15 @@ import {
 } from "@/lib/permits";
 import { recordVerify } from "@/lib/audit-store";
 
+function jsonNoStore(body: unknown, init?: { status?: number }) {
+  return NextResponse.json(body, {
+    status: init?.status,
+    headers: {
+      "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+    },
+  });
+}
+
 function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
   const payload: PermitPayload = {
     id: permit.id,
@@ -30,7 +39,7 @@ function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
 
   const firmaOk = verifySignature(payload, permit.firma);
   if (!firmaOk) {
-    return NextResponse.json({
+    return jsonNoStore({
       valid: false,
       error: "Firma inválida – posible falsificación",
       code: "BAD_SIGNATURE",
@@ -38,7 +47,7 @@ function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
   }
 
   if (sigPrefix && !permit.firma.startsWith(sigPrefix)) {
-    return NextResponse.json({
+    return jsonNoStore({
       valid: false,
       error: "Código QR no coincide con la firma",
       code: "QR_MISMATCH",
@@ -48,16 +57,19 @@ function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
   const now = Date.now();
   const hasta = new Date(permit.validoHasta).getTime();
   const desde = new Date(permit.validoDesde).getTime();
-  const vigente =
-    now >= desde && now <= hasta && permit.status === "activo";
+  const noRevocado = permit.status === "activo";
+  const enPlazo = now >= desde && now <= hasta;
+  const vigente = enPlazo && noRevocado;
 
-  return NextResponse.json({
+  let status: string;
+  if (permit.status === "revocado") status = "revocado";
+  else if (!enPlazo) status = "caducado";
+  else status = "activo";
+
+  return jsonNoStore({
     valid: vigente && firmaOk,
-    status: vigente
-      ? "activo"
-      : permit.status === "revocado"
-        ? "revocado"
-        : "caducado",
+    status,
+    checkedAt: new Date().toISOString(),
     antiForgery: {
       hmacValid: true,
       qrBound: Boolean(sigPrefix),
@@ -78,6 +90,7 @@ function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
       parque: permit.parque,
       municipio: permit.municipio,
       emitidoEn: permit.emitidoEn,
+      status: permit.status,
       firmaPreview: permit.firma.slice(0, 24) + "…",
     },
   });
@@ -85,8 +98,7 @@ function toPublicResponse(permit: StoredPermit, sigPrefix: string | null) {
 
 /**
  * GET /api/permisos/verificar?id=...&sig=...&t=...
- * 1) Busca en disco/memoria
- * 2) Si no hay registro, valida el token auto-contenido del QR (?t=)
+ * El estado en servidor (p. ej. revocado) prevalece siempre sobre el token del QR.
  */
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
@@ -94,7 +106,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("t");
 
   if (!id && !token) {
-    return NextResponse.json(
+    return jsonNoStore(
       { valid: false, error: "Falta id o token" },
       { status: 400 }
     );
@@ -105,35 +117,39 @@ export async function GET(req: NextRequest) {
   if (id) {
     const fromStore = await getPermit(id);
     if (fromStore) {
-      const res = toPublicResponse(fromStore, sigPrefix);
-      return res;
+      return toPublicResponse(fromStore, sigPrefix);
     }
   }
 
   if (token) {
     const fromToken = decodePermitToken(token);
     if (!fromToken) {
-      return NextResponse.json({
+      return jsonNoStore({
         valid: false,
         error: "Token del QR inválido o manipulado",
         code: "BAD_TOKEN",
       });
     }
     if (id && fromToken.id !== id) {
-      return NextResponse.json({
+      return jsonNoStore({
         valid: false,
         error: "El ID no coincide con el token del QR",
         code: "ID_MISMATCH",
       });
     }
+
+    const fromStoreByToken = await getPermit(fromToken.id);
+    if (fromStoreByToken) {
+      return toPublicResponse(fromStoreByToken, sigPrefix);
+    }
+
     const res = toPublicResponse(fromToken, sigPrefix);
-    // Marcar que se usó token (clone body)
     const json = await res.json();
     if (json.antiForgery) json.antiForgery.tokenUsed = true;
-    return NextResponse.json(json);
+    return jsonNoStore(json);
   }
 
-  return NextResponse.json({
+  return jsonNoStore({
     valid: false,
     error:
       "Permiso no encontrado. Si escaneas desde el móvil, asegúrate de que el QR se generó con tu IP LAN (no localhost) y de que el teléfono está en la misma Wi‑Fi.",

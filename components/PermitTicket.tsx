@@ -68,11 +68,22 @@ export function PermitTicket({
             </p>
             {permit.status && (
               <Badge
-                variant={permit.status === "activo" ? "success" : "warning"}
+                variant={
+                  permit.status === "activo"
+                    ? "success"
+                    : permit.status === "revocado"
+                      ? "destructive"
+                      : "warning"
+                }
                 className="mt-3"
               >
                 {permit.status.toUpperCase()}
               </Badge>
+            )}
+            {permit.status === "revocado" && (
+              <p className="mt-3 max-w-xs text-sm font-semibold text-destructive">
+                Anulado por el administrador. No autoriza la recolección.
+              </p>
             )}
           </div>
 
