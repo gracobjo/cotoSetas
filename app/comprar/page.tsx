@@ -30,8 +30,8 @@ export default function ComprarPage() {
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Completa tus datos, paga la tarifa correspondiente y recibe al
-            instante un comprobante con QR por email y en el móvil — como una
-            entrada de cine, listo para enseñar al vigilante o SEPRONA.
+            instante un comprobante con QR por email — listo para enseñar en el
+            móvil al vigilante o SEPRONA.
           </p>
           <div className="mt-8">
             <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando formulario…</p>}>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Shield, Lock, QrCode, Mail, Loader2, Send } from "lucide-react";
+import { Shield, Lock, QrCode, Mail, Loader2 } from "lucide-react";
 import type { Tarifa } from "@/lib/tarifas-store";
 import { validateDniNie } from "@/lib/dni";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,6 @@ type PurchaseResult = {
   email?: { sent: boolean; mode: string };
   delivery?: {
     email: { sent: boolean; mode: string };
-    telegram: { sent: boolean; mode: string; error?: string };
     baseUrl: string;
     warnLocalhost: boolean;
     hint: string | null;
@@ -66,9 +65,6 @@ export function ComprarForm() {
   const [dni, setDni] = useState("");
   const [dniError, setDniError] = useState<string | null>(null);
   const [acepta, setAcepta] = useState(false);
-  const [enviarEmail, setEnviarEmail] = useState(true);
-  const [enviarTelegram, setEnviarTelegram] = useState(true);
-  const [telegramChatId, setTelegramChatId] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -112,14 +108,6 @@ export function ComprarForm() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enviarEmail && !enviarTelegram) {
-      toast({
-        title: "Elige un canal de entrega",
-        description: "Marca email y/o Telegram",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const dniCheck = validateDniNie(dni);
     if (!dniCheck.ok) {
@@ -143,9 +131,8 @@ export function ComprarForm() {
           email,
           dni: dniCheck.normalized,
           aceptaNormativa: acepta,
-          enviarEmail,
-          enviarTelegram,
-          telegramChatId: telegramChatId || undefined,
+          enviarEmail: true,
+          enviarTelegram: false,
         }),
       });
       const data = (await res.json()) as PurchaseResult;
@@ -178,23 +165,12 @@ export function ComprarForm() {
 
       savePermitLocal(data.permit);
 
-      const parts: string[] = [];
-      if (enviarEmail) {
-        parts.push(
-          data.delivery?.email.mode === "simulated" ||
-            data.email?.mode === "simulated"
-            ? "Email simulado"
-            : "Email enviado"
-        );
-      }
-      if (enviarTelegram) {
-        const tg = data.delivery?.telegram;
-        parts.push(
-          tg?.sent
-            ? "Telegram enviado"
-            : `Telegram: ${tg?.error || tg?.mode || "no enviado"}`
-        );
-      }
+      const parts: string[] = [
+        data.delivery?.email.mode === "simulated" ||
+        data.email?.mode === "simulated"
+          ? "Email simulado"
+          : "Comprobante por email",
+      ];
       if (data.delivery?.warnLocalhost) {
         parts.push("⚠️ Configura NEXT_PUBLIC_SITE_URL para el QR móvil");
       }
@@ -285,41 +261,11 @@ export function ComprarForm() {
           )}
         </div>
 
-        <fieldset className="space-y-3 rounded-md border p-4">
-          <legend className="px-1 text-sm font-semibold">
-            Entrega del comprobante
-          </legend>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={enviarEmail}
-              onChange={(e) => setEnviarEmail(e.target.checked)}
-            />
-            <Mail className="h-4 w-4 text-primary" />
-            Correo electrónico
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={enviarTelegram}
-              onChange={(e) => setEnviarTelegram(e.target.checked)}
-            />
-            <Send className="h-4 w-4 text-primary" />
-            Telegram
-          </label>
-          {enviarTelegram && (
-            <div>
-              <Label htmlFor="tg">Chat ID de Telegram</Label>
-              <Input
-                id="tg"
-                value={telegramChatId}
-                onChange={(e) => setTelegramChatId(e.target.value)}
-                className="mt-1.5 font-mono"
-                placeholder="123456789"
-              />
-            </div>
-          )}
-        </fieldset>
+        <p className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          El comprobante con QR se enviará al email indicado tras confirmar el
+          pago.
+        </p>
 
         <label className="flex items-start gap-3 text-sm">
           <input

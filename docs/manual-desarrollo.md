@@ -1,7 +1,7 @@
 # Manual de desarrollo — Villardeciervos Micología
 
-**Versión:** 1.2  
-**Stack:** Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Zod
+**Versión:** 1.3  
+**Stack:** Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Zod, Stripe
 
 ---
 
@@ -9,18 +9,18 @@
 
 ```
 app/                    # Rutas App Router
-  api/                  # API Routes
+  api/                  # API Routes (permisos, stripe, admin…)
   admin/                # Panel administrador
-  comprar/              # Checkout de permisos
-  documentacion/        # Portal de documentación
+  comprar/              # Checkout (+ /exito tras Stripe)
+  documentacion/        # Portal de documentación (solo admin)
   mi-permiso/           # Ticket móvil
   v/[id]/               # URL corta del QR → redirige a verificar
   verificar/[id]/       # Verificación QR
 components/             # UI de secciones y shadcn
 docs/                   # Fuentes markdown de documentación
-lib/                    # Dominio: permisos, tarifas, auth, seguridad, métricas
+lib/                    # Dominio: permisos, tarifas, stripe, auth, seguridad
 data/                   # Persistencia local (gitignored)
-middleware.ts           # Cabeceras OWASP + gate /admin
+middleware.ts           # Cabeceras OWASP + gate /admin y /documentacion
 ```
 
 ---
@@ -32,6 +32,7 @@ npm run dev      # desarrollo en 0.0.0.0:3000
 npm run build    # build producción
 npm run start    # servir build
 npm run lint     # ESLint
+npm run db:migrate  # esquema Neon
 ```
 
 ---
@@ -41,29 +42,30 @@ npm run lint     # ESLint
 | Módulo | Responsabilidad |
 |--------|-----------------|
 | `lib/permits.ts` | Emisión, firma HMAC, URL corta QR, vigencia |
+| `lib/issue-permit.ts` | Emisión compartida (compra simulado / post-Stripe) |
+| `lib/stripe.ts` / `pending-orders.ts` | Checkout y pedidos pendientes |
 | `lib/audit-store.ts` | Auditoría append-only + contadores de uso |
 | `lib/admin-stats.ts` | Agregación de KPIs para el dashboard |
 | `lib/content-store.ts` | CMS: hero, intro HTML, enlaces oficiales |
-| `lib/content-schema.ts` | Validación Zod del contenido editable |
-| `lib/tarifas-store.ts` | Tarifas persistidas / defaults Micocyl |
+| `lib/tarifas-store.ts` | Tarifas Micocyl Zamora + guía de tipos |
 | `lib/dni.ts` | Validación DNI/NIE con letra de control |
 | `lib/admin-auth.ts` | Login admin, cookie httpOnly firmada |
 | `lib/security.ts` | Zod + sanitización de textos |
 | `lib/rate-limit.ts` | Límite de peticiones en memoria |
-| `lib/email.ts` / `telegram.ts` | Entrega del comprobante |
+| `lib/email.ts` | Entrega del comprobante por email |
 
 ---
 
 ## 4. Flujo de emisión de un permiso
 
 1. `POST /api/permisos/comprar` valida Zod + DNI + rate limit.
-2. Carga tarifa activa desde `data/tarifas.json`.
-3. Genera ID, código, hash DNI, firma HMAC.
-4. Construye **URL corta** de verificación: `/v/[id]?s=firma16` (sin token largo en el QR).
-5. Genera QR (PNG data URL, ECC M, ~400 px).
-6. Persiste en `data/permits.json`.
-7. Registra entrada en `data/audit.json` (acción `compra`) y contador diario.
-8. Envía email y/o Telegram.
+2. Si Stripe está activo: crea pedido pendiente + Checkout Session → el usuario paga.
+3. Webhook `POST /api/stripe/webhook` o `GET /api/permisos/por-sesion` (página `/comprar/exito`) confirma el pago.
+4. `issuePermit` genera ID, código, hash DNI, firma HMAC y QR corto `/v/[id]?s=`.
+5. Persiste (Neon o `data/permits.json`), audita la compra y envía **email**.
+6. Redirige a `/mi-permiso`.
+
+Sin `STRIPE_SECRET_KEY` (o con `PAYMENTS_MODE=simulated`) el paso 2–3 se omiten y se emite al instante (solo desarrollo).
 
 ---
 
@@ -73,8 +75,8 @@ Ruta corta del QR: `/v/[id]?s=` → redirige a `/verificar/[id]?sig=`.
 
 API: `GET /api/permisos/verificar?id=&sig=&t=`
 
-1. Incrementa contador de verificaciones (`data/usage.json`).
-2. Busca en disco/memoria.
+1. Incrementa contador de verificaciones.
+2. Busca en disco/memoria/Neon.
 3. Si no está, decodifica y valida el token (`?t=`) si viene en la URL.
 4. Comprueba firma, vigencia y estado (`activo` / `revocado` / `caducado`).
 
@@ -101,10 +103,11 @@ UI: `/admin` → pestaña **Dashboard / KPIs** (`AdminStatsPanel`).
 - O modificar defaults en `lib/content-store.ts` y borrar `data/contenido.json`.
 
 ### Tarifas
-- Editar vía `/admin` → **Tarifas**, o
-- Modificar `DEFAULT_TARIFAS` en `lib/tarifas-store.ts` y borrar `data/tarifas.json`.
+- Editar vía `/admin` → **Tarifas** (precio, kg, modalidad, textos, activa).
+- **Restaurar oficiales Micocyl** sustituye el catálogo por el de Zamora (general 20 € / 2 días; local/vinculado temporada).
+- O modificar `DEFAULT_TARIFAS` en `lib/tarifas-store.ts` y resetear persistencia.
 
-Tipos de tarifa: `local` | `vinculado` | `general`. Campo `activa` controla la visibilidad pública.
+Tipos: `local` | `vinculado` | `general`. Campo `activa` controla la visibilidad pública. `GUIA_TIPOS_PERMISO` alimenta la guía en la landing.
 
 ---
 

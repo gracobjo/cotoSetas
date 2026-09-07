@@ -1,6 +1,6 @@
 # Manual de configuración — Villardeciervos Micología
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Audiencia:** administradores del coto e IT de despliegue
 
 ---
@@ -19,7 +19,7 @@ Copia `.env.example` a `.env.local` (prioridad sobre `.env`).
 | `ADMIN_PASSWORD` | Sí (admin) | Contraseña del panel |
 | `ADMIN_SESSION_SECRET` | Recomendada | Firma de la cookie de sesión admin |
 
-### 1.2 Email (Resend)
+### 1.2 Email (Resend) — comprobante de compra
 
 | Variable | Descripción |
 |----------|-------------|
@@ -31,28 +31,16 @@ Sin API key, el envío se **simula** en consola (`email:simulated`).
 
 Con `onboarding@resend.dev` solo puedes enviar al correo de tu cuenta Resend (o verificar dominio propio).
 
-### 1.3 Telegram
+La compra pública entrega el comprobante **solo por email** (no hay opción Telegram en el formulario).
 
-| Variable | Descripción |
-|----------|-------------|
-| `TELEGRAM_ENABLED` | `true` / `false` |
-| `TELEGRAM_BOT_TOKEN` | Token de BotFather |
-| `TELEGRAM_DEFAULT_CHAT_ID` | Chat por defecto si el usuario no indica otro |
-
-Cómo obtener el chat ID:
-
-1. Usuario escribe `/start` al bot.
-2. Abrir `https://api.telegram.org/bot<TOKEN>/getUpdates`.
-3. Copiar `chat.id`.
-
-### 1.4 Alertas del parte
+### 1.3 Alertas del parte
 
 | Variable | Descripción |
 |----------|-------------|
 | `FORCE_PARTE_DETECTADO` | `true` fuerza detección (pruebas) |
 | `MICOCYL_NEWS_URL` | URL a consultar en producción |
 
-### 1.5 Conflicto `.env` vs `.env.local`
+### 1.4 Conflicto `.env` vs `.env.local`
 
 Si una variable está **vacía** en `.env.local`, **anula** el valor de `.env`. No dejes claves vacías si ya las rellenaste en `.env`.
 
@@ -90,8 +78,9 @@ Pestañas:
    - Introducción (título + HTML básico sanitizado)
    - **CRUD de enlaces oficiales** (crear, editar, ordenar, activar, eliminar)
    - WhatsApp y disclaimer del footer
-3. **Tarifas:** editar precio, kg/día, activar/desactivar, notas de campaña
+3. **Tarifas:** precio, kg/día, modalidad, textos de detalle, activación, notas de campaña; botón **Restaurar oficiales Micocyl** (catálogo Zamora: general 20 € / 2 días, local/vinculado temporada)
 4. **Permisos emitidos:** buscar, ver titular/email/DNI enmascarado, **revocar**
+5. Acceso a **Documentación** (`/documentacion`) desde el panel
 
 Con `DATABASE_URL` todo esto vive en Neon Postgres (no en ficheros locales).
 
@@ -176,7 +165,7 @@ El ID de pago (`paymentIntentId` / sesión) se guarda en el permiso y en la audi
 - [ ] `DATABASE_URL` de Neon en local y en Vercel
 - [ ] `npm run db:migrate` ejecutado
 - [ ] URL pública correcta
-- [ ] Resend / Telegram probados
+- [ ] Resend probado (comprobante por email)
 - [ ] Admin puede entrar, ver Dashboard/KPIs y editar tarifas
 - [ ] Compra de prueba + verificación QR + aparece en auditoría
 - [ ] Stripe: claves + webhook `checkout.session.completed` en producción

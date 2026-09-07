@@ -1,7 +1,7 @@
 # Casos de uso
 
 **Sistema:** Villardeciervos Micología  
-**Versión:** 1.2
+**Versión:** 1.3
 
 ---
 
@@ -12,7 +12,7 @@
 | CU-01 | Consultar información del coto | Visitante | Alta |
 | CU-02 | Consultar tarifas | Visitante / Recolector | Alta |
 | CU-03 | Comprar permiso digital | Recolector | Alta |
-| CU-04 | Recibir comprobante (email/Telegram) | Recolector | Alta |
+| CU-04 | Recibir comprobante por email | Recolector | Alta |
 | CU-05 | Mostrar permiso en móvil | Recolector | Alta |
 | CU-06 | Verificar permiso por QR | Vigilante / SEPRONA | Alta |
 | CU-07 | Recuperar permiso por email | Recolector | Media |
@@ -22,11 +22,20 @@
 | CU-10b | Gestionar contenido y enlaces (CRUD) | Administrador | Alta |
 | CU-11 | Auditar y revocar permisos | Administrador | Alta |
 | CU-11b | Consultar KPIs y auditoría de compras | Administrador | Alta |
-| CU-12 | Consultar documentación | Cualquiera | Media |
+| CU-12 | Consultar documentación | Administrador | Media |
 
 ---
 
 ## 2. Especificaciones
+
+### CU-02 Consultar tarifas
+
+- **Precondiciones:** Tarifas activas publicadas.
+- **Flujo principal:**
+  1. El visitante abre `/#permisos`.
+  2. Lee la guía de tipos (general / local / vinculado; recreativo vs comercial; duración).
+  3. Filtra y elige una modalidad para comprar.
+- **Postcondiciones:** Ninguna (solo lectura).
 
 ### CU-03 Comprar permiso digital
 
@@ -35,10 +44,10 @@
   1. El recolector abre `/comprar` y elige modalidad.
   2. Introduce nombre, email y DNI/NIE.
   3. El sistema valida formato y letra de control.
-  4. Elige canales de entrega y acepta normativa.
+  4. Acepta la normativa.
   5. Confirma y, si Stripe está configurado, paga en Checkout.
   6. Tras cobro confirmado (webhook o página de éxito), el sistema emite permiso firmado, genera QR corto (`/v/[id]?s=`) y lo persiste.
-  7. Registra la compra en el log de auditoría (titular, modalidad, importe, pago, fecha).
+  7. Envía el comprobante por email y registra la compra en auditoría.
   8. Redirige a “Mi permiso”.
 - **Flujos alternativos:**
   - DNI inválido → mensaje de error, no emite.
@@ -46,7 +55,13 @@
   - Pago cancelado → vuelve a `/comprar` sin emitir.
   - Sin `STRIPE_SECRET_KEY` → pago simulado (solo desarrollo).
   - Fallo de email → se informa; el ticket web sigue disponible.
-- **Postcondiciones:** Permiso `activo` almacenado; evento `compra` en auditoría; opcionalmente notificaciones enviadas.
+- **Postcondiciones:** Permiso `activo` almacenado; evento `compra` en auditoría; email enviado si el proveedor está configurado.
+
+### CU-04 Recibir comprobante por email
+
+- **Precondiciones:** Compra completada (pago confirmado o modo simulado).
+- **Flujo principal:** El sistema envía un HTML con código, vigencia y QR al email del titular.
+- **Postcondiciones:** Comprobante entregado o marcado como simulado/disabled según entorno.
 
 ### CU-05 Mostrar permiso en móvil
 
@@ -143,7 +158,6 @@ flowchart LR
   V --> CU01
   V --> CU02
   V --> CU08
-  V --> CU12
   R --> CU02
   R --> CU03
   R --> CU04
@@ -155,6 +169,7 @@ flowchart LR
   A --> CU10b
   A --> CU11
   A --> CU11b
+  A --> CU12
   CU03 --> CU04
   CU03 --> CU05
   CU03 --> CU11b

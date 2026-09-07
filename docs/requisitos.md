@@ -1,14 +1,14 @@
 # Requisitos funcionales y no funcionales
 
 **Sistema:** Villardeciervos Micología  
-**Versión del documento:** 1.2  
+**Versión del documento:** 1.3  
 **Referencia de dominio:** Parque Micológico PMZA-50.001 / Micocyl Castilla y León
 
 ---
 
 ## 1. Alcance
 
-Plataforma web para informar sobre el coto micológico de Villardeciervos y gestionar la **emisión, entrega y verificación** de permisos digitales con medidas anti-falsificación, más un **panel de administración** de tarifas, contenido, permisos, **KPIs de uso** y **auditoría de compras**.
+Plataforma web para informar sobre el coto micológico de Villardeciervos y gestionar la **emisión, cobro (Stripe), entrega por email y verificación** de permisos digitales con medidas anti-falsificación, más un **panel de administración** de tarifas, contenido, permisos, **KPIs de uso** y **auditoría de compras**.
 
 ---
 
@@ -20,7 +20,7 @@ Plataforma web para informar sobre el coto micológico de Villardeciervos y gest
 | Recolector | Compra y porta el permiso |
 | Vigilante / SEPRONA | Verifica el QR in situ |
 | Administrador | Configura tarifas, audita permisos y consulta KPIs |
-| Sistema externo | Resend, Telegram, Micocyl (enlaces) |
+| Sistema externo | Stripe, Resend, Micocyl (enlaces) |
 
 ---
 
@@ -30,10 +30,13 @@ Plataforma web para informar sobre el coto micológico de Villardeciervos y gest
 El sistema deberá mostrar introducción, regulación, especies, ruta Valparaíso, buenas prácticas, parte micológico y enlaces oficiales.
 
 ### RF-02 Tarifas
-El sistema deberá listar tarifas por tipo de recolector (local, vinculado, general) y modalidad (diario, 2 días, temporada; recreativo/comercial), con precio y límite de recolección.
+El sistema deberá listar tarifas por tipo de recolector (local, vinculado, general) y modalidad (2 días / temporada; recreativo/comercial), con precio, límite de recolección y textos explicativos. Deberá publicar una guía breve de diferencias entre tipos. El catálogo de referencia de Zamora no incluye permiso general de 1 día.
 
 ### RF-03 Compra de permiso
 El sistema deberá permitir adquirir un permiso digital tras capturar datos del titular, validar DNI/NIE y aceptar la normativa.
+
+### RF-03b Cobro
+Con Stripe configurado, el sistema deberá cobrar mediante Checkout **antes** de emitir el permiso. Sin clave secreta, podrá emitir en modo simulado solo en desarrollo.
 
 ### RF-04 Comprobante digital
 El permiso deberá incluir identificador, código de seguridad, datos enmascarados del DNI, vigencia, límite, importe y QR de verificación.
@@ -45,10 +48,7 @@ El sistema deberá firmar el permiso (HMAC-SHA256) y permitir verificación onli
 El QR deberá usar una URL corta (`/v/[id]?s=`) de baja densidad, regenerable desde “Mi permiso”, para lectura fiable con la cámara del móvil.
 
 ### RF-06 Entrega por email
-El sistema deberá enviar un comprobante HTML al correo del comprador cuando esté configurado el proveedor de email.
-
-### RF-07 Entrega por Telegram
-El sistema deberá enviar mensaje y QR al chat indicado cuando el bot esté configurado.
+El sistema deberá enviar un comprobante HTML al correo del comprador cuando esté configurado el proveedor de email. La compra pública no ofrece otros canales de entrega.
 
 ### RF-08 Visualización móvil
 El titular deberá poder mostrar el permiso en el móvil (`/mi-permiso`) e imprimirlo.
@@ -63,7 +63,7 @@ El usuario deberá poder activar seguimiento del primer parte de otoño (notific
 El sistema deberá ofrecer modo claro/oscuro.
 
 ### RF-12 Administración de tarifas
-El administrador autenticado deberá poder modificar precios, límites (kg), activación y notas de campaña.
+El administrador autenticado deberá poder modificar precios, límites (kg), modalidad, textos de detalle, activación y notas de campaña, y restaurar el catálogo oficial Micocyl Zamora.
 
 ### RF-12b Administración de contenido y enlaces
 El administrador deberá poder editar textos de portada e introducción (HTML sanitizado), gestionar un CRUD de enlaces oficiales (alta, baja, modificación, orden, activación) y actualizar WhatsApp/disclaimer del pie.
@@ -75,10 +75,10 @@ El administrador deberá listar, buscar y revocar permisos emitidos.
 El panel de administración deberá mostrar indicadores de uso e ingresos: permisos emitidos (activos/revocados/caducados), ingresos (hoy, 7 días, 30 días, total), ticket medio, visitas web, verificaciones de QR, desglose por modalidad y recolector, y serie reciente de actividad.
 
 ### RF-13c Auditoría de compras
-El sistema deberá registrar quién compra qué permiso (titular, email, DNI enmascarado, modalidad, importe, fecha/hora, código) y eventos de revocación y acceso admin, consultables y filtrables en el dashboard.
+El sistema deberá registrar quién compra qué permiso (titular, email, DNI enmascarado, modalidad, importe, fecha/hora, código, referencia de pago si aplica) y eventos de revocación y acceso admin, consultables y filtrables en el dashboard.
 
 ### RF-14 Documentación en línea
-El sistema deberá publicar manuales y documentación técnica en `/documentacion`.
+El sistema deberá publicar manuales y documentación técnica en `/documentacion`, accesible solo con sesión de administrador.
 
 ### RF-15 Disclaimer
 El pie de página deberá indicar el carácter informativo y la referencia a Micocyl.
@@ -131,8 +131,8 @@ Las compras y revocaciones deberán quedar registradas de forma persistente (app
 
 ## 5. Fuera de alcance (versión actual)
 
-- Cobro real con pasarela bancaria (solo simulado).
-- Base de datos multi-instancia (hoy ficheros locales).
+- Pasarela distinta de Stripe (p. ej. Redsys) como integración nativa.
 - App nativa móvil.
 - Emisión oficial vinculada jurídicamente a Micocyl (se informa y enlaza).
 - Analítica de terceros (Google Analytics, etc.).
+- Entrega del comprobante de compra por Telegram (retirada de la compra pública).

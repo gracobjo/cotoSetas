@@ -1,7 +1,7 @@
 # Diagramas UML
 
 **Sistema:** Villardeciervos Micología  
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Notación:** UML 2 (representación Mermaid compatible)
 
 ---
@@ -86,7 +86,6 @@ classDiagram
 
   class DeliveryService {
     +sendEmail()
-    +sendTelegram()
   }
 
   class PermitService {
@@ -209,7 +208,7 @@ flowchart TB
 
   subgraph externos[Servicios externos]
     RESEND[Resend Email]
-    TG[Telegram Bot API]
+    STRIPE[Stripe Checkout]
     OSM[OpenStreetMap]
     MICO[Micocyl enlaces]
   end
@@ -221,7 +220,7 @@ flowchart TB
   LIB --> DATA
   METRICS --> DATA
   LIB --> RESEND
-  LIB --> TG
+  LIB --> STRIPE
   UI --> OSM
   UI --> MICO
 ```
@@ -240,8 +239,9 @@ flowchart TB
 
   R --> Compra[Comprar permiso]
   R --> Mostrar[Mostrar ticket / actualizar QR]
-  Compra --> Entrega[Email/Telegram]
+  Compra --> Entrega[Email]
   Compra --> Audit[Registrar auditoría]
+  Compra --> Pago[Stripe Checkout]
   V --> Verificar[Verificar QR corto]
   A --> Login[Login]
   Login --> KPIs[Dashboard KPIs]
@@ -259,9 +259,10 @@ sequenceDiagram
   actor U as Recolector
   participant Web as Web App
   participant API as API Comprar
+  participant Stripe as Stripe Checkout
   participant Store as Persistencia
   participant Audit as Audit/Usage
-  participant Mail as Resend/Telegram
+  participant Mail as Resend
   actor Vig as Vigilante
   participant Ver as API Verificar
   actor Ad as Admin
@@ -270,9 +271,14 @@ sequenceDiagram
   U->>Web: Completa formulario
   Web->>API: POST /api/permisos/comprar
   API->>API: Valida Zod + DNI + rate limit
+  alt Stripe activo
+    API->>Stripe: Checkout Session
+    Stripe-->>U: Pago con tarjeta
+    Stripe->>API: webhook / por-sesion
+  end
   API->>Store: Guarda StoredPermit firmado
   API->>Audit: append compra + contador día
-  API->>Mail: Envía comprobante
+  API->>Mail: Envía comprobante email
   API-->>Web: permit + QR corto
   Web-->>U: /mi-permiso
 
@@ -300,15 +306,16 @@ flowchart TD
   C --> D{DNI/NIE válido?}
   D -->|No| E[Mostrar error letra/control]
   E --> C
-  D -->|Sí| F{¿Canal de entrega?}
-  F -->|Ninguno| G[Error: elegir email o Telegram]
-  G --> F
-  F -->|OK| H[Aceptar normativa]
-  H --> I[Pago simulado]
-  I --> J[Firmar y generar QR corto]
+  D -->|Sí| H[Aceptar normativa]
+  H --> I{¿Stripe activo?}
+  I -->|Sí| P[Checkout Stripe]
+  P --> Q{Pago OK?}
+  Q -->|No| R[Cancelar / sin emitir]
+  Q -->|Sí| J[Firmar y generar QR corto]
+  I -->|No simulado| J
   J --> K[Persistir permiso]
   K --> L[Registrar auditoría compra]
-  L --> M[Enviar notificaciones]
+  L --> M[Enviar email]
   M --> N[Mostrar ticket móvil]
   N --> O([Fin])
 ```

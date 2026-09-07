@@ -17,13 +17,13 @@ export const DOCS: DocMeta[] = [
   {
     slug: "usuario",
     title: "Manual de usuario",
-    description: "Cómo usar la web, comprar y mostrar el permiso.",
+    description: "Cómo comprar (Stripe + email), mostrar y verificar el permiso.",
     file: "manual-usuario.md",
   },
   {
     slug: "configuracion",
     title: "Manual de configuración",
-    description: "Variables de entorno, admin, KPIs, email, Telegram y despliegue.",
+    description: "Variables de entorno, admin, KPIs, email, Stripe y despliegue.",
     file: "manual-configuracion.md",
   },
   {

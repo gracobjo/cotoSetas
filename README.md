@@ -10,9 +10,10 @@ Stack: **Next.js 14 (App Router) · TypeScript · Tailwind · Shadcn/UI · Frame
 - Tema claro/oscuro, animaciones, SEO y diseño responsive.
 - **Sistema de alertas** del primer parte de otoño (notificaciones + localStorage + email).
 - **Compraventa de permisos digitales** con:
+  - Cobro **Stripe Checkout** (o simulado en desarrollo)
   - Firma HMAC-SHA256 anti-falsificación
   - Código de seguridad de 8 caracteres
-  - QR vinculado a `/verificar/[id]`
+  - QR vinculado a `/verificar/[id]` (vía URL corta `/v/...`)
   - Email tipo entrada de espectáculo (Resend o simulado)
   - Pantalla móvil `/mi-permiso` para enseñar al vigilante o SEPRONA
 
@@ -20,7 +21,7 @@ Stack: **Next.js 14 (App Router) · TypeScript · Tailwind · Shadcn/UI · Frame
 
 ## Documentación en línea
 
-Disponible en la propia aplicación:
+Disponible en la propia aplicación (solo administradores autenticados):
 
 - Índice: `/documentacion`
 - Fuentes markdown en la carpeta `docs/`
@@ -42,9 +43,10 @@ ADMIN_SESSION_SECRET=secreto-largo-aleatorio
 Permite:
 - Editar **contenido de la landing** (hero, intro HTML, footer, WhatsApp)
 - **CRUD de enlaces oficiales**
-- Editar precios, kg/día y activar/desactivar tarifas
+- Editar tarifas (precio, kg, textos, activación) y restaurar catálogo Micocyl Zamora
 - Listar permisos emitidos (titular, email, DNI enmascarado, estado)
 - Revocar permisos
+- KPIs e ingresos / auditoría de compras
 
 ## Seguridad (pautas OWASP)
 
@@ -69,21 +71,16 @@ El QR apunta a `NEXT_PUBLIC_SITE_URL`. Si pone `localhost`, el teléfono **no** 
 5. Escanea el QR → debe mostrar **PERMISO VÁLIDO** con titular y código.
 6. Si el firewall de Windows bloquea, permite Node.js en redes privadas.
 
-El QR incluye un token firmado (`?t=...`) y el permiso se guarda en `data/permits.json`.
+## Email (comprobante de compra)
 
-## Email y Telegram
-
-Configura el fichero `.env` (plantilla en `.env.example`):
+El formulario de compra envía el comprobante **solo por email**.
 
 | Variable | Uso |
 |----------|-----|
 | `RESEND_API_KEY` / `EMAIL_FROM` | Comprobante por correo |
-| `TELEGRAM_BOT_TOKEN` | Token de BotFather |
-| `TELEGRAM_DEFAULT_CHAT_ID` | Chat por defecto |
+| `EMAIL_ENABLED` | `false` desactiva el envío |
 
-En `/comprar` puedes marcar email y/o Telegram e indicar el chat_id.
-
-Para el chat_id: `/start` a tu bot → `https://api.telegram.org/bot<TOKEN>/getUpdates`.
+Sin API key, el envío se **simula** en consola del servidor y el ticket sigue disponible en `/mi-permiso`.
 
 ## Variables de entorno
 
@@ -91,8 +88,11 @@ Para el chat_id: `/start` a tu bot → `https://api.telegram.org/bot<TOKEN>/getU
 |----------|-------------|
 | `PERMIT_HMAC_SECRET` | Secreto fuerte para firmar permisos (obligatorio en producción) |
 | `NEXT_PUBLIC_SITE_URL` | URL pública (ej. `https://tu-dominio.vercel.app`) |
+| `STRIPE_SECRET_KEY` | Cobro real (Checkout); sin ella → pago simulado |
+| `STRIPE_WEBHOOK_SECRET` | Firma del webhook `checkout.session.completed` |
 | `RESEND_API_KEY` | Envío real del comprobante por email |
 | `EMAIL_FROM` | Remitente verificado en Resend |
+| `DATABASE_URL` | Neon Postgres (producción) |
 | `FORCE_PARTE_DETECTADO` | `true` fuerza detección del parte (tests) |
 | `MICOCYL_NEWS_URL` | URL a consultar para el scraper de partes |
 
